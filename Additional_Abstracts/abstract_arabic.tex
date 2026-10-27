@@ -1,0 +1,20 @@
+\babelpolyLangStart{arabic}
+%\selectlanguage{arabic}
+%% Note that Arabic is used as the environment rather than arabic - as TeX 
+% already had a \arabic 
+\begin{abstract}
+    \markboth{\abstractname}{}
+\begin{scontents}[store-env=lang]
+ara
+\end{scontents}
+\begin{scontents}[store-env=abstracts,print-env=true]
+ملخص باللغة العربية.
+\end{scontents}
+
+\keywordHeading{الكلمات المفتاحية}
+\begin{scontents}[store-env=keywords,print-env=true]
+من 5 إلى 6 كلمات رئيسية
+\end{scontents}
+\end{abstract}
+\cleardoublepage
+\babelpolyLangStop{arabic}
