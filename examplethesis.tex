@@ -722,106 +722,76 @@ We would like to thank xxxx for having yyyy.
 \selectlanguage{english}
 \chapter{Introduction}
 \label{ch:introduction}
-\sweExpl{svensk: Introduktion}
 
-
-\sweExpl{Ofta kommer problemet och problemägaren från industrin där man önskar en specifik lösning på ett specifikt problem. Detta är ofta ”för smalt” definierat och ger ofta en ”för smal” lösning för att resultatet skall vara intressant ur ett mer allmänt ingenjörsperspektiv och med ”nya” erfarenheter som resultat. Fundera tillsammans med projektets intressenter (student, problemägare och akademi) hur man skulle kunna använda det aktuella problemet/förslaget för att undersöka någon ingenjörsaspekt och vars resultat kan ge ny eller kompletterande erfarenhet till ingenjörssamfundet och vetenskapen.\\slöser man en del eller hela delen av det ursprungliga problemet.\\Erfarenheten kommer ur en frågeställning som man i examensarbetet försöker besvara med tidigare och andras erfarenhet, egna eller modifierade metoder som ger ett resultat vilket kan användas för att diskutera ett svar på undersökningsfrågan.\\Detta stycke skall alltså, förutom det ursprungliga ”smala” problemet, innehålla  vad som skall undersökas för att skapa ny ingenjörserfarenhet och/eller vetenskap.}
-
-\engExpl{The first paragraph after a heading is not indented, all of the
-  subsequent paragraphs have their first line indented.}
-  
-This chapter describes the specific problem that this thesis addresses, the context of the problem, the
-goals of this thesis project, and outlines the structure of the thesis.\\
-
-\generalExpl{Give a general introduction to the area. (Remember to use appropriate references in this and all other sections.)}
-
-% One can use either biblatex or bibtex - set as the option for the document at the top of this file
-\iftoggle{biblatex}{
-\engExpl{We use the \emph{biblatex} package to handle our references.  We
-use the command \texttt{parencite} to get a reference in parenthesis, like
-this \textbackslash parencite\{heisenberg2015\} resulting in \parencite{heisenberg2015}.  It is also possible to include the author as part of the sentence using \texttt{textcite}, like talking about the work of \textbackslash textcite\{einstein2016\} resulting in \textcite{einstein2016}.\\
-This also means that you have to change the include files to include biblatex and change the way that the \texttt{reference.bib} file is included.}
-}{
-\engExpl{We use the \emph{bibtex} package to handle our references.  We, therefore,
-use the command \textbackslash cite\{farshin\_make\_2019\}. For example, Farshin, \etal described how to improve LLC
-cache performance in \cite{farshin_make_2019} in the context of links running
-at \qty{200}{Gbps}.}
-}
-
-\engExpl{Use the glossaries package to help yourself and your readers.
-Add the acronyms and abbreviations to lib/acronyms.tex. Some examples are shown below:}
-In this thesis, we will examine the use of \glspl{LAN}. In this thesis, we will
-assume that \glspl{LAN} include \glspl{WLAN}, such as \gls{WiFi}.
-
+Speech is still the main way people communicate over telephone networks, voice-over-IP services and video conferencing. Each of these systems can degrade the speech signal through background noise, lossy coding, packet loss, bandwidth limitation or a badly set level. Service providers and equipment designers therefore need to know how good the speech sounds to the people who hear it. This chapter introduces the problem of predicting perceived speech quality automatically, explains why the lack of labelled data limits current models, and states the purpose, goals, method and delimitations of this thesis.
 
 \section{Background}
 \label{sec:background}
-\sweExpl{svensk: Bakgrund}
 
-\generalExpl{Present the background for the area. Set the context for your project – so that your reader can understand both your project and this thesis. (Give detailed background information in Chapter 2 - together with related work.)
-Sometimes it is useful to insert a system diagram here so that the reader
-knows what are the different elements and their relationship to each
-other. This also introduces the names/terms/… that you are going to use
-throughout your thesis (be consistent). This figure will also help you later
-delimit what you are going to do and what others have done or will do.}
+The reference measure of speech quality is the \emph{mean opinion score} (MOS). A group of listeners rates each speech clip on a five-point absolute category rating scale, from 1 (bad) to 5 (excellent), and the MOS is the average of their ratings~\cite{itu_p800}. Listening tests give reliable results, but they are slow and expensive, and they cannot be run continuously on a live network. This has motivated \emph{objective} speech quality models that predict MOS directly from the signal. \emph{Non-intrusive} models are particularly useful because they need only the degraded signal, not a clean reference~\cite{mittag_nisqa_2021}.
 
-As one can find in RFC 1235\,\cite{ioannidis_coherent_1991} multicast is useful for xxxx. A number of different \glspl{OS} have been used in this work, such as the following \glspl{OS}: UNIX, Linux, Windows, etc. The main focus will be on one \gls{OS}, namely Linux.
+A single MOS says how good a clip sounds overall, but not \emph{why} it sounds that way. ITU-T Recommendation P.804~\cite{itu_p804} therefore defines four perceptual quality dimensions in addition to the overall quality: \emph{noisiness} (NOI), \emph{coloration} (COL), \emph{discontinuity} (DIS) and \emph{loudness} (LOUD). Predicting these dimensions makes a model diagnostic. A low MOS caused by background noise needs a different fix from a low MOS caused by packet loss. The NISQA corpus~\cite{mittag_nisqa_2021} made multidimensional prediction practical, as it provides crowdsourced ratings of all five quantities for each clip.
+
+Recent models build on large self-supervised speech representations, such as wav2vec~2.0 XLS-R~\cite{babu_xlsr_2022}, which are pre-trained on many hours of unlabelled speech and then used as fixed feature extractors. One such model is MultiGauss~\cite{cumlin_multigauss_2025}. It predicts a joint multivariate Gaussian distribution over all five quality scores from XLS-R features. Because the output is a distribution, the model gives an uncertainty estimate as well as a score, and it captures how the dimensions correlate with each other. MultiGauss is the reference model in this thesis.
 
 \section{Problem}
 \label{sec:problem}
-\sweExpl{svensk: Problemdefinition eller Frågeställning\\
-Lyft fram det ursprungliga problemet om det finns något och definiera därefter
-den ingenjörsmässiga erfarenheten eller/och vetenskapen som kan komma ur
-projektet. }
 
-Longer problem statement\\
-If possible, end this section with a question as a problem statement.
+Multidimensional models such as MultiGauss are trained with a loss over all five scores, so every training clip needs all five labels. Data labelled in this way is scarce. To the author's knowledge, NISQA is the main public corpus with P.804-style dimension ratings, and it contains roughly 14\,000 clips across its training, validation and test sets~\cite{mittag_nisqa_2021}. Of these, only 1\,020 training clips are real (\emph{live}) calls; the rest have simulated distortions.
 
-% Research Question
+Data labelled with MOS alone is much more plentiful. MOS has been the standard measure for decades, so many corpora with only an overall quality label exist. One example is the PSTN corpus, which has tens of thousands of real telephone calls rated for MOS only~\cite{mittag_pstn_2020}. Other examples cover different domains, for instance synthetic speech~\cite{cooper_bvcc_2022}. A model that needs all five labels for every clip cannot learn from any of this data, so most of the available labelled speech quality data goes unused.
+
 \subsection{Original problem and definition}
 \label{sec:researchQuestion}
-\sweExpl{Ursprungligt problem och definition}
-Some text
 
-\subsection{Scientific and engineering issues}\sweExpl{Vetenskaplig och ingenjörsmässig frågeställning}
-some text
+The problem addressed in this thesis is how to train a multidimensional, probabilistic speech quality model on two kinds of data at the same time: a small corpus labelled with all five quality scores, and a larger corpus labelled with MOS only. The approach studied is to split the prediction into two stages. The first stage predicts the four quality dimensions from the speech features. The second stage predicts MOS from the speech features together with those four dimensions. Because the MOS stage can be trained on its own, clips that carry only a MOS label can still contribute to training. This thesis refers to the resulting model as the \emph{two-stage model} (Chapter~\ref{ch:whatYouDid}).
+
+\subsection{Scientific and engineering issues}
+
+Combining the two kinds of data raises several questions. First, it is not obvious that extra MOS-only data improves MOS prediction, because different corpora are collected with different listeners, rating procedures and distortions, and their MOS scales do not necessarily agree. Second, even if MOS improves, it is unclear whether the four dimensions also benefit, because they receive no labels from the extra data. Third, the two-stage design must be compared with simpler options. These are the joint model trained on fully labelled data only, and a joint model that simply masks out the missing labels in its loss. This leads to the following research questions:
+
+\begin{description}
+\item[RQ1] Can a two-stage probabilistic model trained on a fully labelled corpus (NISQA) and a MOS-only corpus (PSTN) predict MOS better than a joint model trained on the fully labelled corpus alone, both within each corpus and across corpora?
+\item[RQ2] Does the additional MOS-only data also improve prediction of the four quality dimensions (NOI, COL, DIS and LOUD)?
+\item[RQ3] How does the two-stage model compare with a joint model that learns from partially labelled data by masking the missing labels in its loss?
+\end{description}
 
 \section{Purpose}
-\sweExpl{Syfte}
-\sweExpl{Skilj på syfte och mål! Syfte är att förändra något till det bättre. I examensarbetet finns ofta två aspekter på detta. Dels vill problemägaren (företaget) få sitt problem löst till det bättre men akademin och ingenjörssamfundet vill också få nya erfarenheter och vetskap. Beskriv ett syfte som tillfredställer båda dessa aspekter.\\
-Det finns även ett syfte till som kan vara värt att beakta och det är att du som student skall ta examen och att du måste bevisa, i ditt examensarbete, att du uppfyller examensmålen. Dessa mål sammanfaller med kursmålen för examensarbetskursen. 
-}
-\generalExpl{State the purpose of your thesis and the purpose of your degree project.\\
-Describe who benefits and how they benefit if you achieve your goals. Include anticipated ethical, sustainability, social issues, etc. related to your project. (Return to these in your reflections in Section~\ref{sec:reflections}.)}
 
-
+The purpose of this thesis is to find out whether the large amount of existing MOS-only data can be used to build better multidimensional speech quality models, so that less new and expensive multidimensional listening data has to be collected. Better non-intrusive models help network operators and developers of speech communication systems to monitor quality and to find the cause of a degradation without running listening tests. This also has a sustainability and resource benefit. Data that has already been collected and paid for is reused instead of new listening tests being commissioned, and the models are trained on fixed pre-computed features instead of fine-tuning a large network.
 
 \section{Goals}
-\sweExpl{Mål}
-\sweExpl{Skilj på syfte och mål. Syftet är att åstakomma en förändring i något. Målen är vad som konkret skall göras för att om möjligt uppnå den önskade förändringen (syfte). }
 
-\generalExpl{State the goal/goals of this degree project.}
-
-The goal of this project is XXX. This has been divided into the following three sub-goals:
+The goal of this project is to design, train and evaluate a two-stage probabilistic speech quality model that can learn from both fully labelled and MOS-only data, and to compare it fairly with a strong existing model. This goal has been divided into the following sub-goals:
 \begin{enumerate}
-\item Subgoal 1 \sweExpl{för att tillfredsställa problemägaren – industrin?}
-\item Subgoal 2\sweExpl{för att tillfredsställa ingenjörssamfundet och vetenskapen – akademin) }
-\item Subgoal 3\sweExpl{eventuellt, för att uppfylla kursmålen – du som student}
+\item Reproduce the published results of the MultiGauss baseline~\cite{cumlin_multigauss_2025} with the same features and evaluation pipeline, so that comparisons are made on equal terms.
+\item Design and implement the two-stage model and a training procedure that mixes fully labelled NISQA clips and MOS-only PSTN clips in each training batch.
+\item Study how the main design choices affect the results, including the structure of the MOS stage, the ratio between the two corpora in a batch, and the amount of MOS-only data.
+\item Evaluate the model against MultiGauss and against a missing-label (masked loss) baseline, on held-out data from each corpus and on mixed sets that combine corpora, using tests of statistical significance.
 \end{enumerate}
 
-\generalExpl{In addition to presenting the goal(s), you might also state what the deliverables and results of the project are.}
+The deliverables are the trained models, the source code and configuration for every experiment, and the evaluation results reported in Chapter~\ref{ch:resultsAndAnalysis}.
 
-\section{Research Methodology}\sweExpl{Undersökningsmetod}
-\sweExpl{Här anger du vilken vilken övergripande undersökningsstrategi eller metod du skall använda för att försöka besvara den akademiska frågeställning och samtidigt lösa det e v ursprungliga problemet. Ofta kan man använda ”lösandet av ursprungsproblemet” som en fallstudie kring en akademisk frågeställning. Du undersöker någon intressant fråga i ”skarpt” läge och samlar resultat och erfarenhet ur detta.\\
-Tänk på att företaget ibland måste stå tillbaka i sin önskan och förväntan på projektets resultat till förmån för ny eller kompletterande ingenjörserfarenhet och vetenskap (ditt examensarbete). Det är du som student som bestämmer och löser fördelningen mellan dessa två intressen men se till att alla är informerade. }
-\generalExpl{Introduce your choice of methodology/methodologies and method/methods – and the reason why you chose them. Contrast them with and explain why you did not choose other methodologies or methods. (The details of the actual methodology and method you have chosen will be given in Chapter~\ref{ch:methods}. Note that in Chapter~\ref{ch:methods}, the focus could be research strategies, data collection, data analysis, and quality assurance.)\\
-In this section you should present your philosophical assumption(s), research method(s), and research approach(es).}
+\section{Research Methodology}
 
-\section{Delimitations}\sweExpl{Avgränsningar}
-\generalExpl{Describe the boundary/limits of your thesis project and what you are explicitly not going to do. This will help you bound your efforts – as you have clearly defined what is out of the scope of this thesis project. Explain the delimitations. These are all the things that could affect the study if they were examined and included in the degree project.}
+This thesis takes a quantitative, experimental approach. Each research question is answered by training models under controlled conditions, changing one factor at a time, and measuring the effect on held-out data. All models share the same frozen self-supervised features, the same convolutional encoder and the same training schedule, so that differences in the results can be attributed to the factor under study. Performance is measured with the Pearson correlation coefficient (PCC) and the root-mean-square error (RMSE) between predicted and subjective scores, for each quality dimension separately.
 
-\section{Structure of the thesis}\sweExpl{ Rapportens disposition}
-Chapter~\ref{ch:background} presents relevant background information about xxx.  Chapter~\ref{ch:methods} presents the methodology and method used to solve the problem. …
+Training a neural network involves randomness, and small differences in correlation can come from that alone. Every configuration is therefore trained three times with different random initialisations. Differences between models are tested with a hierarchical bootstrap over both training runs and test clips, with a correction for multiple comparisons. A qualitative or user-study method was not chosen, because the subjective ratings that define the ground truth already exist in the corpora used. Chapter~\ref{ch:methods} describes the method in detail.
+
+\section{Delimitations}
+
+The thesis is limited in the following ways:
+\begin{itemize}
+\item The self-supervised feature extractor (wav2vec~2.0 XLS-R) is used frozen, from a single layer, and is not fine-tuned. This keeps training affordable and makes it identical for all models, but it may limit the absolute performance.
+\item NISQA is the only source of quality-dimension labels, and PSTN is the main MOS-only corpus used for training. Other MOS-only corpora are used only for evaluation.
+\item The model is meant for offline (non-real-time) assessment of recorded clips. Streaming or causal prediction is not studied.
+\item Methods that explicitly correct for the different MOS scales of different corpora, such as dataset-specific embeddings or bias-aware losses, are outside the main scope. The thesis studies what the combined data provides without such corrections.
+\item No new listening tests were carried out; all ground-truth ratings come from existing corpora.
+\end{itemize}
+
+\section{Structure of the thesis}
+
+Chapter~\ref{ch:background} presents the background on subjective and objective speech quality assessment, self-supervised speech representations, probabilistic regression and learning from partially labelled data, together with related work. Chapter~\ref{ch:methods} describes the datasets, the features, the baseline models and the evaluation protocol. Chapter~\ref{ch:whatYouDid} presents the proposed two-stage model and how it is trained. Chapter~\ref{ch:resultsAndAnalysis} reports the experiments and their results. Chapter~\ref{ch:discussion} discusses the findings, and Chapter~\ref{ch:conclusionsAndFutureWork} concludes the thesis and suggests future work.
 
 \cleardoublepage
 \chapter{Background}
