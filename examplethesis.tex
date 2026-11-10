@@ -798,6 +798,8 @@ Chapter~\ref{ch:background} presents the background on subjective and objective 
 \cleardoublepage
 \chapter{Background}
 \label{ch:background}
+% Bold vectors/matrices: \bm renders blank with unicode-math (XeLaTeX/LuaLaTeX), so use \symbf there.
+\providecommand{\vect}[1]{\ifdefined\symbf\symbf{#1}\else\bm{#1}\fi}
 
 This chapter gives the background needed to follow the rest of the thesis. Section~\ref{sec:subjectiveQuality} explains how speech quality is measured in listening tests, and Section~\ref{sec:mosAndDimensions} examines how the overall quality relates to the four quality dimensions, which is the basis of the two-stage model. Section~\ref{sec:objectiveModels} reviews objective speech quality models, and Section~\ref{sec:ssl} introduces the self-supervised speech representations used as input features. Section~\ref{sec:probabilistic} describes probabilistic regression, and Section~\ref{sec:partialLabels} covers training on data where some labels are missing. Section~\ref{sec:relatedWork} summarises related work, and Section~\ref{sec:backgroundSummary} summarises the chapter.
 
@@ -878,21 +880,21 @@ A standard regression model predicts a single value for each input and is traine
 
 \subsection{Gaussian negative log-likelihood}
 
-The simplest choice is a Gaussian distribution. For an input $\bm{x}$, the model predicts a mean $\mu(\bm{x})$ and a variance $\sigma^2(\bm{x})$, and is trained to minimise the Gaussian negative log-likelihood (GNLL) of the target $y$~\cite{nix_weigend_1994}:
+The simplest choice is a Gaussian distribution. For an input $\vect{x}$, the model predicts a mean $\mu(\vect{x})$ and a variance $\sigma^2(\vect{x})$, and is trained to minimise the Gaussian negative log-likelihood (GNLL) of the target $y$~\cite{nix_weigend_1994}:
 \begin{equation}
-  \mathcal{L}_{\text{GNLL}} = \frac{1}{2}\log \sigma^2(\bm{x}) + \frac{\big(y - \mu(\bm{x})\big)^2}{2\,\sigma^2(\bm{x})} + \text{const.}
+  \mathcal{L}_{\text{GNLL}} = \frac{1}{2}\log \sigma^2(\vect{x}) + \frac{\big(y - \mu(\vect{x})\big)^2}{2\,\sigma^2(\vect{x})} + \text{const.}
   \label{eq:gnll}
 \end{equation}
 The second term is a squared error scaled by the predicted variance, so the model can lower the penalty on a hard example by predicting a larger variance. The first term penalises large variances, so the model cannot do this everywhere. The predicted variance therefore captures the uncertainty that remains in the data, known as \emph{aleatoric} uncertainty~\cite{kendall_gal_2017}.
 
 \subsection{Multivariate Gaussian}
 
-When several quantities are predicted together, such as MOS and the four dimensions, the model can predict a multivariate Gaussian with mean vector $\bm{\mu}(\bm{x}) \in \mathbb{R}^d$ and covariance matrix $\bm{\Sigma}(\bm{x}) \in \mathbb{R}^{d \times d}$. The covariance describes the uncertainty of each quantity and also how the errors of different quantities are related. The loss is the multivariate GNLL:
+When several quantities are predicted together, such as MOS and the four dimensions, the model can predict a multivariate Gaussian with mean vector $\vect{\mu}(\vect{x}) \in \mathbb{R}^d$ and covariance matrix $\vect{\Sigma}(\vect{x}) \in \mathbb{R}^{d \times d}$. The covariance describes the uncertainty of each quantity and also how the errors of different quantities are related. The loss is the multivariate GNLL:
 \begin{equation}
-  \mathcal{L} = \frac{1}{2}\log \det \bm{\Sigma}(\bm{x}) + \frac{1}{2}\big(\bm{y} - \bm{\mu}(\bm{x})\big)^{\top} \bm{\Sigma}(\bm{x})^{-1} \big(\bm{y} - \bm{\mu}(\bm{x})\big) + \text{const.}
+  \mathcal{L} = \frac{1}{2}\log \det \vect{\Sigma}(\vect{x}) + \frac{1}{2}\big(\vect{y} - \vect{\mu}(\vect{x})\big)^{\top} \vect{\Sigma}(\vect{x})^{-1} \big(\vect{y} - \vect{\mu}(\vect{x})\big) + \text{const.}
   \label{eq:mvgnll}
 \end{equation}
-A covariance matrix must be symmetric and positive definite, which an unconstrained network output does not guarantee. A common solution is to predict a lower-triangular matrix $\bm{L}$ with positive diagonal elements and form $\bm{\Sigma} = \bm{L}\bm{L}^{\top}$, the \emph{Cholesky} parameterisation. For $d$ quantities, the network outputs $d$ means and $d(d+1)/2$ elements of $\bm{L}$.
+A covariance matrix must be symmetric and positive definite, which an unconstrained network output does not guarantee. A common solution is to predict a lower-triangular matrix $\vect{L}$ with positive diagonal elements and form $\vect{\Sigma} = \vect{L}\vect{L}^{\top}$, the \emph{Cholesky} parameterisation. For $d$ quantities, the network outputs $d$ means and $d(d+1)/2$ elements of $\vect{L}$.
 
 \subsection{MultiGauss}
 \label{sec:multigaussBackground}
@@ -906,7 +908,7 @@ When some training examples lack some labels, there are two common ways to still
 
 \subsection{Masking missing labels}
 
-The simplest way is to keep a single model that predicts all outputs and to leave the missing labels out of the loss. Each missing label is marked, for example as \emph{not a number} (NaN), and a mask removes the corresponding terms from the loss, so only the available labels produce gradients. Wang et~al.~\cite{wang_urgentmos_2026} use such a masked loss to train a speech quality model on corpora with different sets of labels, normalising each metric's loss by the number of valid labels. For a Gaussian model, the equivalent is to evaluate the likelihood of the \emph{marginal} distribution of the observed labels, which for a multivariate Gaussian is obtained by keeping only the corresponding entries of $\bm{\mu}$ and $\bm{\Sigma}$. This approach is the baseline for RQ3.
+The simplest way is to keep a single model that predicts all outputs and to leave the missing labels out of the loss. Each missing label is marked, for example as \emph{not a number} (NaN), and a mask removes the corresponding terms from the loss, so only the available labels produce gradients. Wang et~al.~\cite{wang_urgentmos_2026} use such a masked loss to train a speech quality model on corpora with different sets of labels, normalising each metric's loss by the number of valid labels. For a Gaussian model, the equivalent is to evaluate the likelihood of the \emph{marginal} distribution of the observed labels, which for a multivariate Gaussian is obtained by keeping only the corresponding entries of $\vect{\mu}$ and $\vect{\Sigma}$. This approach is the baseline for RQ3.
 
 \subsection{Multi-task and cascaded models}
 
