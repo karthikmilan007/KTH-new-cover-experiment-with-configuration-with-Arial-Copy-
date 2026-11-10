@@ -798,177 +798,133 @@ Chapter~\ref{ch:background} presents the background on subjective and objective 
 \cleardoublepage
 \chapter{Background}
 \label{ch:background}
-\sweExpl{Bakgrund}
 
-\generalExpl{When you do your literature study, you should have a nearly complete Chapters 1 and 2.\\
-You may also find it convenient to introduce the future work section into your report early – so that you can put things that you think about but decide not to do now into this section.\\
-Note that later you can move things between this future work section and what you have done as you may change your mind about what to do now versus what to put off to future work.
-}
-\generalExpl{What does a reader (another x student -- where x is your study line) need to know to understand your report?
-What have others already done? (This is the “related work”.) Explain what and
-how prior work/prior research will be applied on or used in the degree
-project/work (described in this thesis). Explain why and what is not used in
-the degree project and give valid reasons for rejecting the work/research.}
+This chapter gives the background needed to follow the rest of the thesis. Section~\ref{sec:subjectiveQuality} explains how speech quality is measured in listening tests, and Section~\ref{sec:mosAndDimensions} examines how the overall quality relates to the four quality dimensions, which is the basis of the two-stage model. Section~\ref{sec:objectiveModels} reviews objective speech quality models, and Section~\ref{sec:ssl} introduces the self-supervised speech representations used as input features. Section~\ref{sec:probabilistic} describes probabilistic regression, and Section~\ref{sec:partialLabels} covers training on data where some labels are missing. Section~\ref{sec:relatedWork} summarises related work, and Section~\ref{sec:backgroundSummary} summarises the chapter.
 
-This chapter provides basic background information about xxx. Additionally, this chapter describes xxx. The chapter also describes related work xxxx.
+\section{Subjective speech quality}
+\label{sec:subjectiveQuality}
 
+\subsection{Mean opinion score}
 
+Speech quality is a perceptual property: it is defined by how listeners experience a speech signal, not by a physical measurement. The reference method for measuring it is a listening test. ITU-T Recommendation P.800~\cite{itu_p800} describes the most common procedure, the \emph{absolute category rating} (ACR) test. Listeners hear one speech clip at a time and rate its quality on a five-point scale: 5 (excellent), 4 (good), 3 (fair), 2 (poor) and 1 (bad). The \emph{mean opinion score} (MOS) of a clip is the average of the ratings it receives. The standard deviation of the ratings shows how much the listeners disagreed.
 
-\sweExpl{Vilken viktig litteratur och
-  (forsknings-)artiklar har du studerat inom området (litteraturstudie)? }
+Laboratory listening tests are slow and expensive, because they require a controlled environment and a panel of listeners. ITU-T P.808~\cite{itu_p808} therefore specifies how to run ACR tests through crowdsourcing, where many listeners rate clips over the internet with their own equipment. Crowdsourcing makes large rated corpora possible, and the corpora used in this thesis were rated in this way~\cite{mittag_nisqa_2021,mittag_pstn_2020}.
 
-\section{Major background area 1}
-\sweExpl{Viktigt bakgrundsområde 1}
-There are xxx characteristics that distinguish yyy from other information and communication technology (ICT) system, as shown in Figure~\ref{fig:lotsofstars}. Table \ref{tab:tablecaracteristics} summarizes these characteristics.
+\subsection{Quality dimensions}
 
- 
-\begin{figure}[!ht]
-  \begin{center}
-    \includegraphics[width=0.5\textwidth]{figures/lots_of_stars.png}
-  \end{center}
-  \caption{Lots of stars  (Inspired by Figure x.y on page z of [xxx])}
-  \label{fig:lotsofstars}
-\end{figure}
-\sweExpl{Massor av stjärnor (Inspirerad av figur x.y på sidan z i [xxx])}
+MOS states how good a clip sounds, but not why. ITU-T P.804~\cite{itu_p804} defines a diagnostic test in which listeners also rate four perceptual \emph{quality dimensions}, each on a five-point scale where a higher value means better quality:
+\begin{description}
+\item[Noisiness (NOI)] how much the speech is disturbed by background noise, circuit noise or coding noise.
+\item[Coloration (COL)] how much the timbre of the voice is altered, for example by bandwidth limitation or a poor frequency response.
+\item[Discontinuity (DIS)] how much the speech is interrupted or distorted in time, for example by packet loss or clipping.
+\item[Loudness (LOUD)] how far the level of the speech is from a comfortable listening level, whether too quiet or too loud.
+\end{description}
+These dimensions follow earlier research on the perceptual space of transmitted speech, which found that most of the perceived differences between degraded speech signals can be described by a small number of underlying dimensions~\cite{mittag_nisqa_2021}. Rating all four dimensions in addition to the overall quality makes each rating task longer and requires listeners to understand the difference between the dimensions. This is one reason why multidimensional data is much scarcer than MOS-only data.
 
+\subsection{Differences between corpora}
+\label{sec:corpusEffects}
+
+A MOS value is not an absolute quantity. The same clip can receive a different score in two tests, because listeners judge each clip partly in relation to the other clips they hear in the same test. If a test contains mostly poor-quality clips, a medium-quality clip tends to be rated higher than it would be in a test with mostly good clips. The listener panel, the instructions, the listening equipment and the language also influence the ratings~\cite{mittag_biasaware_2021}. As a result, two corpora rated in different tests may use the MOS scale differently, even if both follow the ACR procedure. A model trained on several corpora must therefore learn from labels whose scales do not fully agree. This matters for the two-stage model, which is trained on NISQA and PSTN, two corpora rated in separate tests with different sets of conditions.
+
+\section{The relation between MOS and the quality dimensions}
+\label{sec:mosAndDimensions}
+
+The two-stage model rests on the assumption that MOS depends on the four quality dimensions (Section~\ref{sec:researchQuestion}). The P.804 dimensions were designed to describe the ways in which a speech signal can be degraded, so the overall quality can be expected to reflect their combined effect. The NISQA training labels support this assumption. Table~\ref{tab:mosDimCorrelation} shows the Pearson correlation between MOS and each dimension in the two NISQA training sets, together with the share of the MOS variance that a linear combination of the four dimensions explains ($R^2$).
 
 \begin{table}[!ht]
-  \begin{center}
-    \caption{xxx characteristics}
-    \label{tab:tablecaracteristics}
-    \begin{tabular}{l|S[table-format=4.6]} % <-- Alignments: 1st column left, 2nd middle, with vertical lines in between
-      \textbf{Characteristics} & \textbf{Description}\\
-      $\alpha$ & $\beta$ \\
-      \hline
-      1 & 1110.1\\
-      2 & 10.1\\
-      3 & 23.113231\\
-    \end{tabular}
-  \end{center}
+  \centering
+  \caption{Relation between MOS and the four quality dimensions in the NISQA training labels: Pearson correlation between MOS and each dimension, and the coefficient of determination $R^2$ of a linear regression of MOS on all four dimensions.}
+  \label{tab:mosDimCorrelation}
+  \begin{tabular}{lrrrrrr}
+    \toprule
+    Training set & Clips & NOI & COL & DIS & LOUD & $R^2$ \\
+    \midrule
+    NISQA\_TRAIN\_SIM  & 10\,000 & 0.67 & 0.81 & 0.73 & 0.81 & 0.87 \\
+    NISQA\_TRAIN\_LIVE & 1\,020  & 0.50 & 0.60 & 0.58 & 0.76 & 0.76 \\
+    \bottomrule
+  \end{tabular}
 \end{table}
-\sweExpl{Egenskaper}
-\sweExpl{Beskrivning}
 
-\subsection{Subarea 1.1}
-Entangled states are an important part of quantum cryptography, but also relevant in other domains. This concept might be relevant for neutrinos, see for example \cite{kim_small-mass_2016}.
+Each dimension correlates positively with MOS, so when the rating of a dimension goes up or down, MOS tends to follow. Together, the four dimensions explain 87\,\% of the MOS variance in the simulated training set and 76\,\% in the live set, using only a linear combination. The relation is weaker for the live calls, where degradations are more varied and the labels are noisier. The part of MOS that the four dimensions do not explain is one reason why the MOS stage of the two-stage model also receives the speech features (Chapter~\ref{ch:whatYouDid}).
 
-\subsection{Subarea 1.1.2}
-Computational methods are increasingly used as a third method of carrying out
-scientific investigations. For example, computational experiments were used to
-find the amount of wear in a polyethylene liner of a hip prosthesis in \cite{maguire_jr_new_2014}.
-…
+Table~\ref{tab:mosDimCorrelation} also shows that the dimensions are related to MOS, but not interchangeable with it. The dimensions correlate less with each other than with MOS (for example, 0.39 between NOI and DIS in the simulated set), which confirms that they capture different types of degradation.
 
-\subsection{Subarea 1.1.2}
-Using the nearest data center may improve performance, see \cite{bogdanov_nearest_2015}
+\section{Objective speech quality models}
+\label{sec:objectiveModels}
 
+Objective speech quality models predict the result of a listening test from the speech signal. They are divided into \emph{intrusive} and \emph{non-intrusive} models.
 
-\subsection{Link layer Encapsulation}
-\label{sec:llencap}
+\subsection{Intrusive models}
 
-See Figure~\ref{fig:ieee8023-data-packet} which uses the \textsf{bytefield}  \LaTeX\ package. 
+Intrusive models compare the degraded signal with the clean reference signal it was derived from. The best known are PESQ, ITU-T P.862~\cite{itu_p862}, and its successor POLQA, ITU-T P.863~\cite{itu_p863}. Both align the two signals in time, transform them into a perceptual representation, and map the difference between them to a MOS estimate. Intrusive models are accurate when a reference is available, but in a live call or a recording made in the field, the clean reference does not exist.
 
+\subsection{Non-intrusive models}
 
-\begin{figure}[!ht]
-	\centering
-\begin{bytefield}{21}
-\bitbox[]{7}{} & \bitbox[]{3}{\tiny octets:} & \bitbox[]{4}{\tiny 6} & \bitbox[]{4}{\tiny 6} & \bitbox[]{3}{\tiny 2} & \bitbox[]{5}{\tiny 46 to 1500} & \bitbox[]{3}{\tiny 0 to 46} & \bitbox[]{2}{\tiny 4}\\ 
+Non-intrusive models predict quality from the degraded signal alone. Early examples, such as ITU-T P.563~\cite{itu_p563}, combined hand-crafted signal features with rules. Most current non-intrusive models are deep neural networks trained on rated corpora. MOSNet~\cite{lo_mosnet_2019} used a convolutional and recurrent network on spectrograms to predict the quality of converted speech. DNSMOS~\cite{reddy_dnsmos_2021} predicts the quality of noise-suppressed speech with a convolutional network trained on a large crowdsourced corpus. NISQA~\cite{mittag_nisqa_2021} combines a convolutional network with self-attention, and was the first widely used model to predict the four P.804 dimensions together with MOS. It was trained on the NISQA corpus, which was released with it and is also the multidimensional corpus used in this thesis.
 
-\bitbox[]{8}{\textbf{ETHERNET \\[-1ex] \tiny{data link-layer}}} & \bitbox[]{2}{} & 
+\section{Self-supervised speech representations}
+\label{sec:ssl}
 
-\bitbox{4}{\tiny Destination Address} & \bitbox{4}{\tiny Source Address} & \bitbox{3}{\tiny Length/ Type} & 
-\bitbox{5}{\tiny Data Payload} & \bitbox{3}{\tiny Padding} &
-\bitbox{2}{\tiny CRC} \\
+Training a deep network from raw audio needs a lot of labelled data, and rated speech quality data is limited. Self-supervised learning reduces this need. A model is first pre-trained on large amounts of unlabelled speech with a task that needs no human labels, and the representations it learns are then reused for other tasks.
 
-\bitbox[]{1}{} &\bitbox[]{3}{\tiny octets:} & \bitbox[]{4}{\tiny 7} & \bitbox[]{2}{\tiny 1} & \bitbox[]{0}{$\vdots$ \\[1ex]} & \bitbox[]{16}{} & \bitbox[]{0}{$\vdots$ \\[1ex]} & \bitbox[]{5}{} & \bitbox[]{4}{\tiny Variable}\\
+wav2vec~2.0~\cite{baevski_wav2vec2_2020} is a widely used self-supervised model. A convolutional encoder turns the waveform into a sequence of latent frames, about one every 20\,ms, and a transformer network processes the sequence. During pre-training, part of the latent sequence is masked, and the model learns to identify the correct latent frame at each masked position among a set of distractors. XLS-R~\cite{babu_xlsr_2022} scales this approach to 436\,000 hours of speech in 128 languages, with models of up to two billion parameters.
 
-\bitbox[]{4}{\textbf{MAC \\[-1ex] \tiny{packet}}} & \colorbitbox{lightgray}{4}{\tiny Preamble} & \colorbitbox{lightgray}{2}{\tiny SFD} & \colorbitbox{lightgray}{16}{\tiny MAC Client Data} & \colorbitbox{lightgray}{3}{\tiny Padding} &
-\colorbitbox{lightgray}{2}{\tiny CRC} & \colorbitbox{lightgray}{4}{\tiny Extension}
-\end{bytefield}
-     \caption{Ethernet data link layer protocol encapsulated into a IEEE~802.3 MAC packet}
-     \label{fig:ieee8023-data-packet}
-\end{figure}
+The output of each transformer layer of such a model can be used as a sequence of feature vectors. Different layers capture different information: lower layers are closer to the acoustic signal, and higher layers are closer to phonetic and linguistic content. Features from self-supervised models have been shown to improve MOS prediction considerably, especially for data that differs from the training data~\cite{cooper_bvcc_2022}. MultiGauss~\cite{cumlin_multigauss_2025} uses the output of one intermediate layer of the two-billion-parameter XLS-R model, without fine-tuning, and this thesis uses the same features.
 
-\subsection{IP packet headers}
-\label{sec:ipheaders}
-The data link layer will receive a packet from the IP layer. The layout of
-an IPv4 packet is shown in Figure~\ref{fig:ipv4-header}. This should be
-contrasted with the IPv6 header shown in Figure~\ref{fig:ipv6-header}.
+\section{Probabilistic regression}
+\label{sec:probabilistic}
 
-%
-% IPv4 packet header
-%
-\begin{figure}[!ht]
-	\centering
-\begin{bytefield}{32}
-\bitheader{0-31} \\
-\bitbox{4}{\footnotesize{Version}} & \bitbox{4}{IHL} & \bitbox{6}{\tiny{Type of Service}} & \bitbox{2}{{\scriptsize ECN}} \bitbox{16}{Total Length}\\
-\bitbox{16}{Identification} & \bitbox{3}{Flags} & \bitbox{13}{Fragment Offset}\\
-\bitbox{8}{Time to Live} & \bitbox{8}{Protocol} & \bitbox{16}{Header Checksum}\\
-\wordbox{1}{Source Address}\\
-\wordbox{1}{Destination Address}\\
-\colorbitbox{lightgray}{24}{Options} & \colorbitbox{lightgray}{8}{Padding}
-\end{bytefield}
-     \caption[IPv4 datagram header]{IPv4 datagram header. Light grey-colored fields are optional.}
-    \label{fig:ipv4-header} 
-\end{figure}
+A standard regression model predicts a single value for each input and is trained to minimise, for example, the squared error. A \emph{probabilistic} regression model instead predicts a probability distribution over the target. This gives an estimate of how uncertain the prediction is, which is useful for speech quality, where the listeners themselves disagree and some clips are harder to judge than others.
 
-%
-% IPv6 packet header
-%
-\begin{figure}[!ht]
-	\centering
-\begin{bytefield}{32}
-\bitheader{0-31} \\
-\bitbox{4}{\footnotesize{Version}} & \bitbox{8}{Traffic Class} & \bitbox{20}{Flow Label}\\
-\bitbox{16}{Payload Length} & \bitbox{8}{Next Header} & \bitbox{8}{Hop Limit}\\
-\wordbox{4}{Source Address}\\
-\wordbox{4}{Destination Address}\\
-\end{bytefield}
-     \caption{IPv6 datagram header}
-    \label{fig:ipv6-header}
-\end{figure}
+\subsection{Gaussian negative log-likelihood}
 
-\subsection{Test for accessibility of formulas}
+The simplest choice is a Gaussian distribution. For an input $\bm{x}$, the model predicts a mean $\mu(\bm{x})$ and a variance $\sigma^2(\bm{x})$, and is trained to minimise the Gaussian negative log-likelihood (GNLL) of the target $y$~\cite{nix_weigend_1994}:
+\begin{equation}
+  \mathcal{L}_{\text{GNLL}} = \frac{1}{2}\log \sigma^2(\bm{x}) + \frac{\big(y - \mu(\bm{x})\big)^2}{2\,\sigma^2(\bm{x})} + \text{const.}
+  \label{eq:gnll}
+\end{equation}
+The second term is a squared error scaled by the predicted variance, so the model can lower the penalty on a hard example by predicting a larger variance. The first term penalises large variances, so the model cannot do this everywhere. The predicted variance therefore captures the uncertainty that remains in the data, known as \emph{aleatoric} uncertainty~\cite{kendall_gal_2017}.
 
-As can be seen in these equations:
-$c=2 \cdot \pi \cdot r$ or \[ \int_{a}^{b} x^2 \,dx \] a chemical formula: $(C_5O_2H_8)_n$
-...
-\section{Major background area 2}\sweExpl{Viktigt bakgrundsområde 2}
-...
-\subsection{\glsentryshort{WLAN} Security}% you can't use the \gls() command in a heading - but you can get the short (\glsentryshort) or long version (\glsentryshort) or \glsentrylong or even the text entry (\glsentrytext) and then there is no problem - see https://tex.stackexchange.com/questions/198140/glossaries-and-custom-section-headings-broken
+\subsection{Multivariate Gaussian}
 
-\subsection{Network layer security}
-...
+When several quantities are predicted together, such as MOS and the four dimensions, the model can predict a multivariate Gaussian with mean vector $\bm{\mu}(\bm{x}) \in \mathbb{R}^d$ and covariance matrix $\bm{\Sigma}(\bm{x}) \in \mathbb{R}^{d \times d}$. The covariance describes the uncertainty of each quantity and also how the errors of different quantities are related. The loss is the multivariate GNLL:
+\begin{equation}
+  \mathcal{L} = \frac{1}{2}\log \det \bm{\Sigma}(\bm{x}) + \frac{1}{2}\big(\bm{y} - \bm{\mu}(\bm{x})\big)^{\top} \bm{\Sigma}(\bm{x})^{-1} \big(\bm{y} - \bm{\mu}(\bm{x})\big) + \text{const.}
+  \label{eq:mvgnll}
+\end{equation}
+A covariance matrix must be symmetric and positive definite, which an unconstrained network output does not guarantee. A common solution is to predict a lower-triangular matrix $\bm{L}$ with positive diagonal elements and form $\bm{\Sigma} = \bm{L}\bm{L}^{\top}$, the \emph{Cholesky} parameterisation. For $d$ quantities, the network outputs $d$ means and $d(d+1)/2$ elements of $\bm{L}$.
 
-\section{Related work area}\sweExpl{Relaterade arbeten}
+\subsection{MultiGauss}
+\label{sec:multigaussBackground}
 
+MultiGauss~\cite{cumlin_multigauss_2025} applies this approach to speech quality. It takes XLS-R features of a clip, passes them through two convolutional layers and three fully connected layers, and outputs a five-dimensional Gaussian over MOS, NOI, COL, DIS and LOUD: five means and 15 Cholesky elements. It is trained with the loss in Equation~\eqref{eq:mvgnll} on the NISQA corpus. Because the loss involves all five quantities, every training clip must have all five labels. MultiGauss is the baseline in this thesis, and its architecture is described in more detail in Chapter~\ref{ch:methods}.
 
-\subsection{Major related work 1}\sweExpl{Relaterade arbeten 1}
-Carrier clouds have been suggested as a way to reduce the delay between the users and the cloud server that is providing them with content. However, there is a question of how to find the available resources in such a carrier cloud. One approach has been to disseminate resource information using an extension to OSPF-TE, see Roozbeh, Sefidcon, and Maguire \cite{roozbeh_resource_2013}.
+\section{Learning from partially labelled data}
+\label{sec:partialLabels}
 
+When some training examples lack some labels, there are two common ways to still use them.
 
-\subsection{Major related work n}\sweExpl{Relaterade arbeten}
+\subsection{Masking missing labels}
 
-\subsection{Minor related work 1}\sweExpl{Mindre relaterat arbete 1}
+The simplest way is to keep a single model that predicts all outputs and to leave the missing labels out of the loss. Each missing label is marked, for example as \emph{not a number} (NaN), and a mask removes the corresponding terms from the loss, so only the available labels produce gradients. Wang et~al.~\cite{wang_urgentmos_2026} use such a masked loss to train a speech quality model on corpora with different sets of labels, normalising each metric's loss by the number of valid labels. For a Gaussian model, the equivalent is to evaluate the likelihood of the \emph{marginal} distribution of the observed labels, which for a multivariate Gaussian is obtained by keeping only the corresponding entries of $\bm{\mu}$ and $\bm{\Sigma}$. This approach is the baseline for RQ3.
 
+\subsection{Multi-task and cascaded models}
 
-…
-\subsection{Minor related work n}\sweExpl{Mindre relaterat arbete n}
+The second way is to structure the model so that different parts are trained by different labels. In \emph{multi-task learning}, several tasks share part of a network, typically the feature encoder, and each task has its own output head~\cite{caruana_multitask_1997}. Each training example then updates the shared part and the heads for which it has labels. Learning related tasks together can improve each of them, because the shared representation must be useful for all of them.
 
+A \emph{cascaded} model goes one step further, by feeding the output of one head into another. The two-stage model in this thesis is of this kind: the first stage predicts the four dimensions, and the second stage uses them to predict MOS. Training a cascade raises a well-known question about what the second stage should receive. During training, it can receive the true values of the first-stage outputs, called \emph{teacher forcing}~\cite{williams_zipser_1989}, which gives clean inputs and fast learning. At test time, however, only the first stage's predictions are available, and they contain errors the second stage never saw during training. \emph{Scheduled sampling}~\cite{bengio_scheduled_2015} addresses this mismatch by gradually replacing the true values with predictions during training. Both options are examined for the two-stage model in Chapter~\ref{ch:resultsAndAnalysis}.
 
-\section{Summary}\sweExpl{Sammanfattning}
-\sweExpl{Det är trevligt om detta kapitel
-  avslutas med en sammanfattning. Till exempel kan du inkludera en tabell som
-  sammanfattar andras idéer och fördelar och nackdelar med varje - så som
-  senare kan du jämföra din lösning till var och en av dessa. Detta kommer
-  också att hjälpa dig att definiera de variabler som du kommer att använda
-  för din utvärdering.}
+\section{Related work}
+\label{sec:relatedWork}
 
-\engExpl{It is nice to have this chapter conclude with a summary. For
-  example, you can include a table that summarizes other people's ideas and
-  benefits and drawbacks with each - so as later you can compare your solution
-  to each of them. This will also help you define the variables that you will
-  use for your evaluation.}
+Several earlier works use more than one corpus to train a MOS model. Mittag et~al.~\cite{mittag_biasaware_2021} train on several corpora together and handle their different MOS scales with a \emph{bias-aware} loss, which learns a mapping between the model's prediction and each corpus's scale. Other models include the listener or the corpus as an extra input, so that the model can learn their individual biases. MBNet~\cite{leng_mbnet_2021} and LDNet~\cite{huang_ldnet_2022} do this for individual listeners. These methods aim to correct for differences between corpora, which is outside the scope of this thesis (Section~\ref{sec:researchQuestion}). This thesis instead studies how much combined training helps without such corrections.
+
+Multidimensional models are fewer. NISQA~\cite{mittag_nisqa_2021} predicts the five quantities with separate output heads on a shared network, and MultiGauss~\cite{cumlin_multigauss_2025} predicts them jointly as a single distribution. Both are trained on fully labelled data only. Wang et~al.~\cite{wang_urgentmos_2026} show that a masked loss lets a single model learn from corpora with different label sets, but to the author's knowledge, no earlier work has examined whether adding MOS-only data also improves the prediction of the P.804 dimensions, which is the focus of RQ2.
+
+\section{Summary}
+\label{sec:backgroundSummary}
+
+Speech quality is measured in listening tests as a MOS, and P.804 adds four quality dimensions that explain the overall quality. In the NISQA labels, a linear combination of the four dimensions explains most of the MOS variance, which supports the assumption behind the two-stage model. MOS values from different corpora are not on exactly the same scale, which is a challenge for any model trained on combined data. Modern non-intrusive models use features from large self-supervised speech models, and MultiGauss predicts all five quantities as one multivariate Gaussian. Since a joint model needs all five labels, MOS-only data can be used either by masking missing labels or by a multi-task or cascaded design. The two-stage model uses a cascaded design.
 
 \cleardoublepage
 \chapter{Method or Methods}
