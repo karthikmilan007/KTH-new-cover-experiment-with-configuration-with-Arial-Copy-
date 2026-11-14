@@ -929,178 +929,198 @@ Multidimensional models are fewer. NISQA~\cite{mittag_nisqa_2021} predicts the f
 Speech quality is measured in listening tests as a MOS, and P.804 adds four quality dimensions that explain the overall quality. In the NISQA labels, a linear combination of the four dimensions explains most of the MOS variance, which supports the assumption behind the two-stage model. MOS values from different corpora are not on exactly the same scale, which is a challenge for any model trained on combined data. Modern non-intrusive models use features from large self-supervised speech models, and MultiGauss predicts all five quantities as one multivariate Gaussian. Since a joint model needs all five labels, MOS-only data can be used either by masking missing labels or by a multi-task or cascaded design. The two-stage model uses a cascaded design.
 
 \cleardoublepage
-\chapter{Method or Methods}
+\chapter{Method}
 \label{ch:methods}
-\sweExpl{Metod eller Metodval}
-\generalExpl{This chapter is about Engineering-related
-  content, Methodologies and Methods.  Use a self-explaining title.\\The
-  contents and structure of this chapter will change with your choice of
-  methodology and methods.}
 
+This chapter describes how the research questions were investigated. Section~\ref{sec:researchProcess} gives an overview of the research process. Section~\ref{sec:datasets} presents the datasets and Section~\ref{sec:features} the input features. Section~\ref{sec:baselines} describes the baseline models, Section~\ref{sec:experimentalDesign} the experiments, and Section~\ref{sec:evaluation} how the models were evaluated. Section~\ref{sec:reliabilityValidity} discusses the reliability and validity of the method. The proposed two-stage model itself is described in Chapter~\ref{ch:whatYouDid}.
 
-
-\generalExpl{Describe the engineering-related contents (preferably with models) and the research methodology and methods that are used in the degree project.\\
-Give a theoretical description of the scientific or engineering methodology  you are going to use and why have you chosen this method. What other methods did you consider and why did you reject them?\\
-In this chapter, you describe what engineering-related and scientific skills you are going to apply, such as modeling, analyzing, developing, and evaluating engineering-related and scientific content. The choice of these methods should be appropriate for the problem. Additionally, you should be conscious of aspects relating to society and ethics (if applicable). The choices should also reflect your goals and what you (or someone else) should be able to do as a result of your solution - which could not be done well before you started.}
-
-The purpose of this chapter is to provide an overview of the research method
-used in this thesis. Section~\ref{sec:researchProcess} describes the research
-process. Section~\ref{sec:researchParadigm} details the research
-paradigm. Section~\ref{sec:dataCollection} focuses on the data collection
-techniques used for this research. Section~\ref{sec:experimentalDesign}
-describes the experimental design. Section~\ref{sec:assessingReliability}
-explains the techniques used to evaluate the reliability and validity of the
-data collected. Section~\ref{sec:plannedDataAnalysis} describes the method
-used for the data analysis. Finally, Section~\ref{sec:evaluationFramework}
-describes the framework selected to evaluate xxx.
-
-\sweExpl{Vilka vetenskaplig eller ingenjörs-metodik ska du använda och varför har du valt den här metoden. Vilka andra metoder gjorde du övervägde du och varför du avvisar dem.
-Vad är dina mål? (Vad ska du kunna göra som ett resultat av din lösning - vilken inte kan göras i god tid innan du började)
-Vad du ska göra? Hur? Varför? Till exempel, om du har implementerat en artefakt vad gjorde du och varför? Hur kommer du utvärdera den.
-Syftet med detta kapitel är att ge en översikt över forsknings metod som
-används i denna avhandling. Avsnitt~\ref{sec:researchProcess} beskriver forskningsprocessen. Avsnitt~\ref{sec:researchParadigm} beskriver forskningsparadigmen detaljerat. Avsnitt~\ref{sec:dataCollection} fokuserar på datainsamlingstekniker som används för denna forskning. Avsnitt~\ref{sec:experimentalDesign} beskriver experimentell
-design. Avsnitt~\ref{sec:assessingReliability} förklarar de tekniker som används för att utvärdera
-tillförlitligheten och giltigheten av de insamlade uppgifterna. Avsnitt~\ref{sec:plannedDataAnalysis}
-beskriver den metod som används för dataanalysen. Slutligen, Avsnitt~\ref{sec:evaluationFramework}
-beskriver ramverket som valts för att utvärdera xxx.\\
-Ofta kan man koppla ett antal följdfrågor till undersökningsfrågan och problemlösningen t ex\\
-(1) Vilken process skall användas för konstruktion av lösningen och vilken process skall kopplas till denna för att svara på undersökningsfrågan?\\
-(2) Hur och vilket resultat (storheter) skall presenteras både för att redovisa svar på undersökningsfrågan (resultatkapitlet i denna rapport) och redovisa resultat av problemlösningen (prototypen, ofta dokument som bilagor men vilka dokument och varför?).\\
-(3) Vilken teori/teknik skall väljas och användas både för undersökningen (taxonomi, matematik, grafer, storheter mm)  och  problemlösning (UML, UseCases, Java mm) och varför?\\
-(4) Vad behöver du som student leverera för att uppnå hög kvalitet (minimikrav) eller mycket hög kvalitet på examensarbetet?\\
-(5) Frågorna kopplar till de följande underkapitlen.\\
-(6) Resonemanget bygger på att studenter på hing-programmet ofta skall konstruera något åt problemägaren och att man till detta måste koppla en intressant ingenjörsfråga. Det finns hela tiden en dualism mellan dessa aspekter i exjobbet.
-}
-
-\section{Research Process}
+\section{Research process}
 \label{sec:researchProcess}
 
-\sweExpl{Undersökningsprocess och utvecklingsprocess}
-
-Figure~\ref{fig:researchprocess} shows the steps conducted to carry out this research. 
-
-\sweExpl{Figur~\ref{fig:researchprocess} visar de steg som utförs för att genomföra\\
-Beskriv, gärna med ett aktivitetsdiagram (UML?), din undersökningsprocess och utvecklingsprocess.  Du måste koppla ihop det akademiska intresset (undersökningsprocess) med ursprungsproblemet (utvecklingsprocess)
-denna forskning.\\
-Aktivitetsdiagram från t ex UML-standard}
-
-
- 
-\begin{figure}[!ht]
-  \begin{center}
-    \includegraphics[width=0.5\textwidth]{figures/researchprocess.png}
-  \end{center}
-  \caption{Research Process}
-  \label{fig:researchprocess}
-\end{figure}
-
-\generalExpl{Example of using customized item labels.}
-Some steps in the process:
-\begin{enumerate}[leftmargin=*, label=\textbf{Step \arabic*}, ref=Step \arabic*] %labelindent=1em for indent
-    \itemsep0em
-    \item \label{x:s1} plan experiment,
-    \item \label{x:s2} conduct experiment,
-    \item \label{x:s3} analyze data from the experiment, and
-    \item \label{x:s4} discuss the results of the analysis.
+The work followed five steps:
+\begin{enumerate}
+\item \textbf{Reproduce the baseline.} The published MultiGauss model was evaluated with the same features and evaluation code as all later models, to confirm that the pipeline reproduces the published results.
+\item \textbf{Build the two-stage model.} The model was designed so that MOS-only clips can train it together with fully labelled clips (Chapter~\ref{ch:whatYouDid}).
+\item \textbf{Design studies.} The main design choices, such as the structure of the MOS stage and the mix of corpora in a training batch, were varied one at a time to decide the final configuration.
+\item \textbf{Main experiments.} The final two-stage model was compared with the baselines in two experiments, one with a separate MOS-only corpus and one with a MOS-only subset of the same corpus.
+\item \textbf{Statistical evaluation.} The differences between models were tested for significance, to separate real effects from training randomness.
 \end{enumerate}
 
-\sweExpl{Forskningsprocessen}
+\section{Datasets}
+\label{sec:datasets}
 
+\subsection{NISQA corpus}
 
-\section{Research Paradigm}
-\label{sec:researchParadigm}
-\sweExpl{Undersökningsparadigm\\
-Exempelvis\\
-Positivistisk (vad/hur fungerar det?) kvalitativ fallstudie med en deduktivt (förbestämd) vald ansats och ett induktivt(efterhand uppstår dataområden och data) insamlade av data och erfarenheter.}
+The NISQA corpus~\cite{mittag_nisqa_2021} is the source of all multidimensional labels in this thesis. Each clip has crowdsourced ratings for MOS and for the four P.804 dimensions, collected with on average about five ratings per clip and averaged into one score per quantity. The clips are English speech, about 6--12 seconds long. Table~\ref{tab:nisqaSplits} lists the parts used.
 
+\begin{table}[!ht]
+  \centering
+  \caption{Parts of the NISQA corpus used in this thesis. All parts have labels for MOS and the four quality dimensions.}
+  \label{tab:nisqaSplits}
+  \begin{tabular}{llrl}
+    \toprule
+    Part & Distortions & Clips & Use \\
+    \midrule
+    NISQA\_TRAIN\_SIM   & simulated & 10\,000 & training \\
+    NISQA\_TRAIN\_LIVE  & live calls & 1\,020 & training \\
+    NISQA\_VAL\_SIM     & simulated & 2\,500 & checkpoint selection, evaluation \\
+    NISQA\_VAL\_LIVE    & live calls & 200 & checkpoint selection, evaluation \\
+    NISQA\_TEST\_FOR      & simulated and live & 240 & evaluation only \\
+    NISQA\_TEST\_P501     & simulated and live & 240 & evaluation only \\
+    NISQA\_TEST\_LIVETALK & live recordings & 232 & evaluation only \\
+    \bottomrule
+  \end{tabular}
+\end{table}
 
-\section{Data Collection}
-\label{sec:dataCollection}
-\sweExpl{Datainsamling\\
-(Detta bör också visa att du är medveten om de sociala och etiska frågor som
-kan vara relevanta för dina data insamlingsmetod.)}
-\generalExpl{This should also show that you are aware of the social and ethical concerns that might be relevant to your data collection method.}
+The \emph{simulated} parts (SIM) were created by passing clean speech through simulated transmission and processing, such as codecs, packet loss, noise, filtering and level changes, so they cover a wide range of quality. The \emph{live} parts (LIVE) are real calls made over Skype and from landlines to mobile phones. The 1\,020 LIVE training clips come from 495 different source recordings.
 
+The SIM and LIVE parts have quite different label distributions, which is important for Experiment~B (Section~\ref{sec:expB}). Table~\ref{tab:simLiveStats} compares the two training sets. The LIVE clips are rated clearly lower than the SIM clips for MOS, coloration and loudness, and they span a narrower range of scores. Fewer than 1\,\% of the LIVE clips have a MOS of 4 or higher, compared with about 25\,\% of the SIM clips. Discontinuity is the only dimension with a similar distribution in both parts. A narrow range of true scores also makes correlation-based metrics lower, so scores on LIVE data are expected to be lower than on SIM data for every model.
 
+\begin{table}[!ht]
+  \centering
+  \caption{Mean and standard deviation of the labels in the two NISQA training sets.}
+  \label{tab:simLiveStats}
+  \begin{tabular}{lcc}
+    \toprule
+    Quantity & NISQA\_TRAIN\_SIM & NISQA\_TRAIN\_LIVE \\
+    \midrule
+    MOS  & 2.98 (1.10) & 2.23 (0.70) \\
+    NOI  & 3.27 (0.96) & 2.91 (0.71) \\
+    COL  & 3.01 (0.93) & 2.25 (0.53) \\
+    DIS  & 3.51 (0.97) & 3.61 (0.69) \\
+    LOUD & 3.42 (0.84) & 2.26 (0.67) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
 
-\subsection{Sampling}
-\sweExpl{Stickprovsundersökning}
+\subsection{PSTN corpus}
 
-\subsection{Sample Size}
-\sweExpl{Provstorleken}
+The PSTN corpus~\cite{mittag_pstn_2020} contains real telephone calls made over the public switched telephone network and VoIP, rated with crowdsourced ACR tests. It has MOS labels only, so it serves as the MOS-only corpus in Experiment~A. Because of storage limits, two subsets were drawn from it, each stratified by MOS so that the score distribution of the full set is preserved:
+\begin{itemize}
+\item \textbf{PSTN\_TRAIN12K}: 12\,000 clips from the PSTN training set, used for training (mean MOS 3.12, standard deviation 0.87).
+\item \textbf{PSTN\_VAL2K}: 2\,000 clips from the PSTN validation set, used only for evaluation.
+\end{itemize}
 
-\subsection{Target Population}
-\sweExpl{Målgruppen}
+\subsection{BVCC}
 
-\section[Experimental design/Planned Measurements]{Experimental design and\\Planned Measurements}
+BVCC~\cite{cooper_bvcc_2022} contains synthetic speech from text-to-speech and voice conversion systems, rated for naturalness on a MOS scale. Its validation set of 387 clips is used only to evaluate how well the models generalise to a domain none of them was trained on.
+
+\subsection{Overlap check}
+
+Before evaluation, the data was checked for overlap between training and evaluation sets. The NISQA validation sets share no clips and no source recordings with the NISQA training sets, and PSTN\_VAL2K shares no clips with PSTN\_TRAIN12K.
+
+\section{Feature extraction}
+\label{sec:features}
+
+All models use the same input features, taken from the two-billion-parameter XLS-R model~\cite{babu_xlsr_2022}, the same feature extractor as MultiGauss~\cite{cumlin_multigauss_2025}. Each clip is resampled to 16\,kHz and passed through XLS-R, and the output of the 12th transformer layer is kept: a sequence of 1\,920-dimensional vectors, one per 20\,ms. XLS-R is not fine-tuned, so the features were computed once for every clip and stored on disk, which makes training much faster and identical for all models.
+
+Clips shorter than 10 seconds are repeated until they reach 10 seconds, and longer clips are cut, so every clip gives a feature sequence of the same length. The original MultiGauss work uses 8 seconds. The longer crop was kept for all models trained in this thesis, so the comparisons between them are not affected.
+
+The choice of layer was examined in an early design study (Section~\ref{sec:designStudies}).
+
+\section{Baseline models}
+\label{sec:baselines}
+
+\subsection{MultiGauss}
+
+MultiGauss~\cite{cumlin_multigauss_2025} is the main baseline (Section~\ref{sec:multigaussBackground}). Its architecture is:
+\begin{itemize}
+\item two one-dimensional convolutional layers with 32 channels and kernel size 5, each followed by layer normalisation, a ReLU activation, dropout of 0.3 and max pooling by a factor of 5;
+\item three fully connected layers with 64, 32 and 20 outputs;
+\item the 20 outputs give 5 means and the 15 elements of a lower-triangular Cholesky factor, which form a five-dimensional Gaussian over MOS, NOI, COL, DIS and LOUD.
+\end{itemize}
+It is trained with the multivariate Gaussian negative log-likelihood (Equation~\eqref{eq:mvgnll}) on clips that have all five labels.
+
+The published MultiGauss checkpoint, trained on all NISQA training data, was evaluated with the pipeline of this thesis. Its average PCC over the five quantities on the three test sets was 0.838 (LIVETALK), 0.824 (FOR) and 0.855 (P501), against 0.834, 0.829 and 0.862 in the original paper. The pipeline therefore reproduces the published results to within about 0.007.
+
+\subsection{MultiGauss trained on simulated data only}
+
+For Experiment~B, MultiGauss was also trained from scratch on NISQA\_TRAIN\_SIM only, using its own training procedure: 64 clips per step, 350 steps per epoch, up to 30 epochs, and the Adam optimiser~\cite{kingma_adam_2015} with a learning rate of $10^{-4}$. This is the \emph{multidimensional data alone} baseline: it sees exactly the same fully labelled data as the two-stage model in that experiment, but none of the MOS-only data.
+
+\subsection{MultiGauss with a masked loss}
+\label{sec:nanBaseline}
+
+The baseline for RQ3 is MultiGauss trained on fully labelled and MOS-only clips together, with the missing labels masked out (Section~\ref{sec:partialLabels}). Each batch holds 32 NISQA\_TRAIN\_SIM clips with all five labels and 32 NISQA\_TRAIN\_LIVE clips whose four dimension labels are set to NaN. For each clip, the loss is the negative log-likelihood of the \emph{marginal} Gaussian over the labels that are present. For a fully labelled clip this is the normal MultiGauss loss, and for a MOS-only clip it is the univariate Gaussian loss on MOS:
+\begin{equation}
+  \mathcal{L}_{\text{MOS-only}} = \frac{1}{2}\log \Sigma_{\text{MOS,MOS}} + \frac{\big(y_{\text{MOS}} - \mu_{\text{MOS}}\big)^2}{2\,\Sigma_{\text{MOS,MOS}}} + \text{const.}
+  \label{eq:marginalLoss}
+\end{equation}
+Everything else is the same as for MultiGauss trained on SIM only. This baseline follows the masked loss proposed in URGENT-MOS~\cite{wang_urgentmos_2026}, adapted to a Gaussian model. It uses the same data as the two-stage model but no special architecture, so it shows how much of any gain comes from the data itself.
+
+\section{Experimental design}
 \label{sec:experimentalDesign}
-\sweExpl{Experimentdesign/Mätuppställning}
 
-\subsection{Test environment/test bed/model}
-\engExpl{Describe everything that someone else would need to reproduce your test environment/test bed/model/… .}
-\sweExpl{Testmiljö/testbädd/modell\\
-Beskriv allt att någon annan skulle behöva återskapa din testmiljö / testbädd / modell / …}
+\subsection{Training settings}
 
-\subsection{Hardware/Software to be used}
-\sweExpl{Hårdvara / programvara som ska användas}
+Unless stated otherwise, all models in this thesis share the following settings. Each training step uses a batch of 64 clips, made up of 32 fully labelled clips and 32 MOS-only clips for the two-stage model. An epoch has 350 steps, and training runs for at most 30 epochs with the Adam optimiser and a learning rate of $10^{-4}$. Training stops early if the validation result has not improved for 15 epochs. After each epoch, the model is evaluated on the NISQA validation sets, and the weights from the epoch with the highest MOS PCC are kept.
 
+\subsection{Experiment A: adding a separate MOS-only corpus}
+\label{sec:expA}
 
-\section{Assessing reliability and validity of the data collected}
-\label{sec:assessingReliability}
-\sweExpl{Bedömning av validitet och reliabilitet hos använda metoder och insamlade data }
+Experiment~A tests whether a MOS-only corpus recorded and rated separately from the multidimensional corpus helps the model. This is the realistic case: in practice, extra MOS-only data will come from a different test, with different listeners and conditions.
+\begin{itemize}
+\item \textbf{Two-stage model:} trained on all NISQA training data (SIM and LIVE, with all five labels) together with PSTN\_TRAIN12K (MOS only).
+\item \textbf{Baseline:} the published MultiGauss checkpoint, trained on all NISQA training data.
+\item \textbf{Evaluation:} a combined set of 2\,000 NISQA validation clips and all 2\,000 PSTN\_VAL2K clips. The NISQA clips are a fixed random draw from NISQA\_VAL\_SIM and NISQA\_VAL\_LIVE in their natural proportions (1\,852 and 148 clips). MOS is evaluated on the whole set and on each half; the four dimensions are evaluated on the NISQA validation sets.
+\end{itemize}
+The combined set measures whether a model places clips from both corpora on one consistent MOS scale, which per-corpus metrics cannot show. Experiment~A mainly answers RQ1.
 
+\subsection{Experiment B: a MOS-only subset of the same corpus}
+\label{sec:expB}
 
-\subsection{Validity of method}
-\label{sec:validtyOfMethod}
-\sweExpl{Giltigheten av metoder\\
-  Har dina metoder gett dig de rätta svaren och lösningarna? Var metoderna korrekta?}
+Experiment~B tests the same idea under controlled conditions, by turning part of NISQA into MOS-only data. The 1\,020 LIVE training clips are used with their MOS label only, and their dimension labels are discarded.
+\begin{itemize}
+\item \textbf{Two-stage model:} trained on NISQA\_TRAIN\_SIM (all five labels) together with NISQA\_TRAIN\_LIVE (MOS only), 32 clips of each per batch.
+\item \textbf{Baselines:} MultiGauss trained on NISQA\_TRAIN\_SIM only, and MultiGauss with the masked loss on the same data as the two-stage model (Section~\ref{sec:baselines}).
+\item \textbf{Evaluation:} all five quantities on NISQA\_VAL\_SIM, NISQA\_VAL\_LIVE and the three NISQA test sets.
+\end{itemize}
+Since all the data comes from one corpus with one rating procedure, differences in MOS scale between corpora play no role. All models see exactly the same fully labelled data, so any difference in the dimension scores must come from the MOS-only data or from the way the model uses it. Experiment~B answers RQ2 and RQ3, and also gives a second answer to RQ1.
 
-\engExpl{How will you know if your results are valid?}
-\engExpl{Remember that validity is about the \textit{accuracy} of a measurement while reliability is about the \textit{consistency} of the measurement values under the same conditions (\ie repeatability).}
+\subsection{Design studies}
+\label{sec:designStudies}
 
-\subsection{Reliability of method}
-\label{sec:reliabilityOfMethod}
-\sweExpl{Tillförlitlighet av för metoder\\
-Hur bra är dina metoder, finns det bättre metoder? Hur kan du förbättra dem?}
-\engExpl{How will you know if your results are reliable?}
+The following studies were used to decide the configuration of the two-stage model. Each varies one factor and keeps the rest fixed. Their results are reported in Section~\ref{sec:designStudyResults}.
+\begin{description}
+\item[Structure of the MOS stage.] A MOS stage that receives only the four predicted dimensions is compared with one that also receives the encoded speech features.
+\item[Teacher forcing or scheduled sampling.] During training, the MOS stage receives the true dimension values of the fully labelled clips (teacher forcing). This is compared with scheduled sampling~\cite{bengio_scheduled_2015}, where the true values are gradually replaced by the first stage's predictions, linearly over the first 20 of 30 epochs.
+\item[Batch ratio, Experiment~A setting.] With the batch size fixed at 64, the number of PSTN clips per batch is varied from 11 to 43 (20\,\% to 200\,\% of the NISQA clips).
+\item[Batch ratio, Experiment~B setting.] The SIM:LIVE split of a 64-clip batch is varied: 56:8, 48:16, 32:32, 16:48 and 63:1.
+\item[Equal amounts of data.] Two checks of the Experiment~B result: a batch of 64 SIM plus 64 LIVE clips, so that the first stage sees as many fully labelled clips per step as MultiGauss does; and equal pools of 1\,020 SIM and 1\,020 LIVE clips, so that the LIVE clips are not repeated more often than the SIM clips.
+\item[Amount of multidimensional data.] The two-stage model is trained on only 500 NISQA clips, first with different shares of PSTN clips in a fixed total of 500, and then with 200 to 1\,000 PSTN clips added. MultiGauss is trained on the same 500 NISQA clips for comparison.
+\item[XLS-R layer.] Features from layers 12, 22 and 32 of XLS-R are compared.
+\item[Hyperparameters.] The learning rate ($3\times10^{-5}$ to $10^{-3}$, constant or cosine schedule), weight decay, dropout, and the weight of the dimension loss relative to the MOS loss are varied. Each setting is chosen on the validation sets and reported on the test sets.
+\end{description}
+The XLS-R layer study and the first batch ratio study were single training runs, carried out early in the project. Their results are therefore indicative only. All other studies used three runs per configuration.
 
-\subsection{Data validity}
-\label{sec:dataValidity}
-\sweExpl{Giltigheten av uppgifter\\
-Hur vet du om dina resultat är giltiga? Är ditt resultat rättvisande?}
+\section{Evaluation}
+\label{sec:evaluation}
 
-\subsection{Reliability of data}
-\label{sec:reliabilityOfData}
-\sweExpl{Tillförlitlighet av data\\
-Hur vet du om dina resultat är tillförlitliga? Hur bra är dina resultat?}
+\subsection{Metrics}
 
+Each model is evaluated separately for MOS and each of the four dimensions, using the per-clip predicted means. The main metric is the \emph{Pearson correlation coefficient} (PCC) between predicted and true scores, which measures how well the model ranks the clips, independently of any constant offset or scaling. The \emph{root-mean-square error} (RMSE) is also reported, as it measures how close the predicted values are to the true ones on the absolute scale. As a single summary of the multidimensional performance, the average of the five PCCs is used, as in the MultiGauss paper~\cite{cumlin_multigauss_2025}.
 
-\section{Planned Data Analysis}
-\label{sec:plannedDataAnalysis}
-\sweExpl{Metod för analys av data}
+\subsection{Evaluation sets}
 
+Results are reported for each evaluation set on its own, and for sets combined (\emph{pooled}) into one. Pooling several sets tests whether the model's scores are consistent across them, because a clip from one set is ranked against clips from the others. Pooling is used for the three NISQA test sets, the two NISQA validation sets, and the NISQA and PSTN mix of Experiment~A.
 
-\subsection{Data Analysis Technique}
-\label{sec:dataAnalysisTechnique}
-\sweExpl{Dataanalysteknik}
+\subsection{Repeated runs and significance}
 
-\subsection{Software Tools}
-\label{sec:softwareTools}
-\sweExpl{Mjukvaruverktyg}
+Training a neural network involves randomness, from the initial weights, the order of the batches and dropout. Each configuration was therefore trained three times, with no fixed random seed, and results are given as the mean over the three runs.
 
+Whether a difference between two models is real is tested with a \emph{hierarchical bootstrap}, which accounts for both sources of variation: the training runs and the evaluation clips. In each of 10\,000 bootstrap rounds, the training runs of each model are resampled with replacement, then the evaluation clips are resampled with replacement, and the metric difference is recomputed. Both models use the same resampled clips, and for pooled sets the clips are resampled within each set, so that its composition stays the same. The \emph{p}-value is the share of rounds in which the difference has the opposite sign to the observed one, doubled for a two-sided test. Because many comparisons are made, the \emph{p}-values in each table are adjusted with the Holm method~\cite{holm_1979}, and a difference is called significant if its adjusted \emph{p}-value is below 0.05.
 
-\section{Evaluation framework}
-\label{sec:evaluationFramework}
-\sweExpl{Utvärdering och ramverk\\
-Metod för utvärdering, jämförelse mm. Kopplar till kapitel~\ref{ch:resultsAndAnalysis}.}
+\section{Reliability and validity}
+\label{sec:reliabilityValidity}
 
-\section{System documentation}
-\label{sec:systemDocumentation}
-\sweExpl{Systemdokumentation\\
-Med vilka dokument och hur skall en konstruerad prototyp dokumenteras? Detta blir ofta bilagor till rapporten och det som problemägaren till det ursprungliga problemet (industrin) ofta vill ha.\\
-Bland dessa bilagor återfinns ofta, och enligt någon angiven standard, kravdokument, arkitekturdokument, designdokumnet, implementationsdokument, driftsdokument, testprotokoll mm.}
-\generalExpl{If this is going to be a complete document consider putting it in as an appendix, then just put the highlights here.}
+Several measures were taken to make the results reliable and the comparisons fair:
+\begin{itemize}
+\item All models use the same features, the same evaluation code and, where they are trained in this thesis, the same training schedule.
+\item The evaluation pipeline was checked against the published MultiGauss results.
+\item Every configuration was trained three times, and differences were tested for significance rather than judged from the means.
+\item The test sets were never used for any decision: neither for selecting checkpoints, nor for choosing hyperparameters.
+\end{itemize}
 
+The method also has limitations. The checkpoint of every model is selected on NISQA validation MOS, so results on the validation sets are slightly optimistic, for the baselines and the two-stage model alike. The test sets are not affected, so the main conclusions are drawn from them where possible. Three runs per configuration give a rough estimate of the training variation, and small differences may go undetected. Finally, NISQA and PSTN are the only multidimensional and MOS-only training corpora used, so the conclusions may not carry over unchanged to other corpora.
 
 \cleardoublepage
 \chapter{What you did}\engExpl{Choose your own chapter title to describe this}
