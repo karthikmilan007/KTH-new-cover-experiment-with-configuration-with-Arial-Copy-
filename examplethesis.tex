@@ -1123,292 +1123,165 @@ Several measures were taken to make the results reliable and the comparisons fai
 The method also has limitations. The checkpoint of every model is selected on NISQA validation MOS, so results on the validation sets are slightly optimistic, for the baselines and the two-stage model alike. The test sets are not affected, so the main conclusions are drawn from them where possible. Three runs per configuration give a rough estimate of the training variation, and small differences may go undetected. Finally, NISQA and PSTN are the only multidimensional and MOS-only training corpora used, so the conclusions may not carry over unchanged to other corpora.
 
 \cleardoublepage
-\chapter{What you did}\engExpl{Choose your own chapter title to describe this}
+\chapter{The Two-Stage Model}
 \label{ch:whatYouDid}
-\sweExpl{[Vad gjorde du? Hur gick det till? – Välj lämplig rubrik (“Genomförande”, “Konstruktion”, ”Utveckling”  eller annat]}
 
+This chapter describes the model proposed in this thesis. Section~\ref{sec:modelOverview} explains the idea behind it, Sections~\ref{sec:sharedEncoder} to~\ref{sec:mosStage} describe its parts, and Section~\ref{sec:training} explains how it is trained on fully labelled and MOS-only clips together. Section~\ref{sec:inference} describes how it is used at test time, Section~\ref{sec:comparisonMultiGauss} compares it with MultiGauss, and Section~\ref{sec:implementation} gives implementation details.
 
-\engExpl{What have you done? How did you do it? What design decisions did you make? How did what you did help you to meet your goals?}
-\sweExpl{Vad du har gjort? Hur gjorde du det? Vilka designval gjorde du?\\
-Hur kom det du hjälpte dig att uppnå dina mål?}
+\section{Overview and motivation}
+\label{sec:modelOverview}
 
-% the following sets the TOC entry to break after the & - note you have to include the first letter of the following word as it get swolled by the \texorpdfstring{}{} processing
-\section[Hardware/Software design …/Model/Simulation model  parameters/…]{Hardware/Software design …/Model/Simulation model \& parameters/…}
-\sweExpl{Hårdvara / Mjukvarudesign ... / modell / Simuleringsmodell och parametrar / …}
+The model is built on the assumption stated in Section~\ref{sec:researchQuestion}: that MOS depends on the four quality dimensions. The NISQA labels support this, since a linear combination of the four dimensions explains 87\,\% of the MOS variance in the simulated training data and 76\,\% in the live data (Section~\ref{sec:mosAndDimensions}). The model therefore predicts quality in two stages, as shown in Figure~\ref{fig:twoStageModel}. The first stage predicts the four dimensions from the speech features. The second stage predicts MOS from those four dimensions together with the speech features.
 
-Figure~\ref{fig:homepageicon} shows a simple icon for a home page. The time
-to access this page when served will be quantified in a series of
-experiments. The configurations that have been tested in the test bed are
-listed in Table~\ref{tab:configstested}. In \SI{7.0}{\percent} of cases, there was an error indicating xxxxx.
+This structure has a practical consequence, which is the main reason for the design. A model that predicts all five quantities jointly needs all five labels for every training clip. In the two-stage model, the MOS stage produces its own output and has its own loss, so a clip with only a MOS label can still be used to train it. Fully labelled clips and MOS-only clips can therefore be mixed in the same training batch.
 
-\sweExpl{Figur~\ref{fig:homepageicon}  visar en enkel ikon för en hemsida. Tiden för att få tillgång till den här sidan när den laddas kommer att kvantifieras i en serie experiment. De konfigurationer som har testats i provbänk listas ini tabell~\ref{tab:configstested}.\\
-Vad du har gjort? Hur gjorde du det? Vilka designval gjorde du?}
- 
+The structure also makes it possible to test the second hypothesis of this thesis: that if MOS depends on the dimensions, learning to predict MOS better should also improve the dimension predictions. As Section~\ref{sec:training} explains, the error on a MOS-only clip flows back through the predicted dimensions into the first stage, so the MOS-only data can in principle influence the dimension predictions.
+
 \begin{figure}[!ht]
-  \begin{center}
-    \includegraphics[width=0.25\textwidth]{figures/Homepage-icon.png}
-  \end{center}
-  \caption{Homepage icon}
-  \label{fig:homepageicon}
+  \centering
+  \begin{tikzpicture}[
+      box/.style={draw, rounded corners, align=center, minimum height=1.0cm, text width=2.6cm, font=\small},
+      out/.style={draw, dashed, rounded corners, align=center, minimum height=1.0cm, text width=2.4cm, font=\small},
+      arr/.style={->, thick},
+      node distance=0.9cm and 0.8cm
+    ]
+    \node[box] (feat) {XLS-R features\\(layer 12)};
+    \node[box, right=of feat] (enc) {Shared\\convolutional\\encoder};
+    \node[box, above right=0.3cm and 0.8cm of enc] (s1) {Stage 1:\\dimension stage};
+    \node[box, below right=0.3cm and 0.8cm of enc] (s2) {Stage 2:\\MOS stage};
+    \node[out, right=of s1] (o1) {4-D Gaussian\\NOI, COL, DIS, LOUD};
+    \node[out, right=of s2] (o2) {1-D Gaussian\\MOS};
+    \draw[arr] (feat) -- (enc);
+    \draw[arr] (enc.east) -- ++(0.35,0) |- (s1.west);
+    \draw[arr] (enc.east) -- ++(0.35,0) |- node[pos=0.75, below, font=\footnotesize] {encoded features} (s2.west);
+    \draw[arr] (s1) -- (o1);
+    \draw[arr] (s2) -- (o2);
+    \draw[arr] (s1.south) -- node[right, font=\footnotesize, align=left] {dimension values} (s2.north);
+  \end{tikzpicture}
+  \caption{The two-stage model. The shared encoder processes the XLS-R features once. Stage~1 predicts a Gaussian over the four quality dimensions, and Stage~2 predicts MOS from the encoded features and the four dimension values. During training, Stage~2 receives the true dimension values for fully labelled clips and Stage~1's predictions for MOS-only clips. At test time it always receives Stage~1's predictions.}
+  \label{fig:twoStageModel}
 \end{figure}
+
+\section{Shared encoder}
+\label{sec:sharedEncoder}
+
+The input to the model is the sequence of XLS-R feature vectors described in Section~\ref{sec:features}. A shared encoder turns this sequence into a shorter, more compact representation. It consists of two one-dimensional convolutional layers with 32 channels and kernel size 5. Each is followed by layer normalisation, a ReLU activation, dropout with probability 0.3, and max pooling by a factor of 5. The encoder is the same as the convolutional part of MultiGauss~\cite{cumlin_multigauss_2025}, so the two models differ only in how the encoded representation is turned into quality predictions.
+
+The encoder runs once for each clip, and its output $\vect{h}$ is used by both stages. Both stages therefore send their training signal back into the same encoder.
+
+\section{Stage 1: the dimension stage}
+\label{sec:dimensionStage}
+
+The first stage predicts the four quality dimensions. It flattens the encoder output and passes it through three fully connected layers with 64, 32 and 14 outputs, with ReLU activations between them. The 14 outputs define a four-dimensional Gaussian: 4 values for the mean vector $\vect{\mu}_d$, and 10 values for a lower-triangular Cholesky factor $\vect{L}_d$ (4 diagonal and 6 off-diagonal elements). A softplus function keeps the diagonal elements positive, so that $\vect{\Sigma}_d = \vect{L}_d\vect{L}_d^{\top}$ is a valid covariance matrix (Section~\ref{sec:probabilistic}).
+
+As in MultiGauss, the network output is mapped onto the rating scale by an affine transformation. The mean becomes $2\vect{\mu}_d + 3$, so that an output of 0 corresponds to the middle of the 1--5 scale, and the covariance is scaled by 4 to match. In the rest of this chapter, $\vect{\mu}_d$ and $\vect{\Sigma}_d$ denote the values after this mapping.
+
+\section{Stage 2: the MOS stage}
+\label{sec:mosStage}
+
+The second stage predicts MOS from two inputs:
+\begin{enumerate}
+\item \textbf{Four dimension values} $\vect{q} \in \mathbb{R}^4$, passed through two fully connected layers with 32 and 16 outputs and ReLU activations.
+\item \textbf{The encoded speech features} $\vect{h}$, flattened into one vector.
+\end{enumerate}
+The two resulting vectors are concatenated and passed through fully connected layers with 64, 32 and 2 outputs. The two outputs give the MOS mean $\mu_m$ and, after a softplus function, its variance $\sigma_m^2$. The same affine mapping as in Stage~1 is applied: the mean becomes $2\mu_m + 3$, and the variance is scaled by 4. In short, Stage~2 computes
+\begin{equation}
+  \big(\mu_m, \sigma_m^2\big) = g\big(\vect{h}, \vect{q}\big).
+  \label{eq:mosStage}
+\end{equation}
+
+The dimension values $\vect{q}$ are the main input, in line with the assumption that MOS depends on the dimensions. The encoded features are added because the four dimensions do not explain all of MOS: about 13\,\% of the MOS variance in the simulated training data, and 24\,\% in the live data, is not explained by a linear combination of them (Table~\ref{tab:mosDimCorrelation}). The features give Stage~2 access to the rest of the information in the signal. Section~\ref{sec:designStudyResults} compares this design with a MOS stage that receives only the four dimension values.
+
+\section{Training}
+\label{sec:training}
+
+\subsection{Two kinds of training clips}
+
+Each training step uses a batch of $B_\ell = 32$ fully labelled clips and $B_m = 32$ MOS-only clips. The two kinds of clips are passed through the model differently, as summarised in Table~\ref{tab:trainingPaths}.
 
 \begin{table}[!ht]
-  \begin{center}
-    \caption{Configurations tested}
-    \label{tab:configstested}
-    \resizebox{\columnwidth}{!}{%
-    \begin{tabular}{l|c} % <-- Alignments: 1st column left, 2nd middle and 3rd right, with vertical lines in between
-      \textbf{Configuration} & \textbf{Description} \\
-      \hline
-      1 & Simple test with one server\\
-      2 & Simple test with one server\\
-    \end{tabular}
-    }
-  \end{center}
+  \centering
+  \caption{How the two kinds of training clips are used.}
+  \label{tab:trainingPaths}
+  \begin{tabular}{p{3.2cm}p{4.6cm}p{4.6cm}}
+    \toprule
+     & Fully labelled clip & MOS-only clip \\
+    \midrule
+    Stage 1 loss & 4-D Gaussian NLL on the four dimension labels & none (no dimension labels) \\
+    Input $\vect{q}$ to Stage 2 & true dimension values $\vect{y}_d$ & Stage~1's predictions $\vect{\mu}_d$ \\
+    Stage 2 loss & Gaussian NLL on the MOS label & Gaussian NLL on the MOS label \\
+    \bottomrule
+  \end{tabular}
 \end{table}
-\sweExpl{Testade konfigurationer}
 
-\section{Implementation …/Modeling/Simulation/…}
-\label{sec:implementationDetails}
-\sweExpl{Implementering … / modellering / simulering / …}
+\subsection{Loss function}
 
-Two commonly used simulators are:
-\begin{description}[labelwidth =\widthof{\textbf{ns-2 or ns-3 simulator}}, leftmargin = !]
-    \item[\textbf{Mininet}] This simulator uses traffic control (\texttt{tc}) to simulate network devices connected by links with specific bandwidth, packet loss rates, qdisc methods, etc.
-    
-    
-    \item[\textbf{ns-2 or ns-3 simulator}] These simulators are very useful for simulating wireless communication links between moving devices. You can specify the mobility patterns of the nodes.
-\end{description}
+For a fully labelled clip with dimension labels $\vect{y}_d$ and MOS label $y_m$, Stage~1 is trained with the four-dimensional Gaussian negative log-likelihood (Equation~\eqref{eq:mvgnll}):
+\begin{equation}
+  \ell_{d} = \frac{1}{2}\log\det\vect{\Sigma}_d + \frac{1}{2}\big(\vect{y}_d - \vect{\mu}_d\big)^{\top}\vect{\Sigma}_d^{-1}\big(\vect{y}_d - \vect{\mu}_d\big),
+  \label{eq:dimLoss}
+\end{equation}
+and Stage~2 with the univariate Gaussian negative log-likelihood (Equation~\eqref{eq:gnll}) of the MOS label:
+\begin{equation}
+  \ell_{m} = \frac{1}{2}\log\big(2\pi\sigma_m^2\big) + \frac{\big(y_m - \mu_m\big)^2}{2\,\sigma_m^2}.
+  \label{eq:mosLoss}
+\end{equation}
+For a fully labelled clip, Stage~2 receives the true dimension values, $\vect{q} = \vect{y}_d$. For a MOS-only clip, only $\ell_m$ is computed, and Stage~2 receives the dimensions predicted by Stage~1, $\vect{q} = \vect{\mu}_d$. The loss for one training step is the sum of three averages:
+\begin{equation}
+  \mathcal{L} =
+  \underbrace{\frac{1}{B_\ell}\sum_{i=1}^{B_\ell} \ell_{d,i}}_{\text{dimensions, labelled clips}}
+  + \underbrace{\frac{1}{B_\ell}\sum_{i=1}^{B_\ell} \ell_{m,i}\big(\vect{q} = \vect{y}_{d,i}\big)}_{\text{MOS, labelled clips}}
+  + \underbrace{\frac{1}{B_m}\sum_{j=1}^{B_m} \ell_{m,j}\big(\vect{q} = \vect{\mu}_{d,j}\big)}_{\text{MOS, MOS-only clips}}.
+  \label{eq:totalLoss}
+\end{equation}
+The three terms have equal weight. The fully labelled and the MOS-only clips are passed through the model separately, and their losses are added before a single update of all the weights.
 
-\subsection{Some examples of coding}
-\engExpl{This section is simply to show some example of how you can include code in your thesis - this is not a section you would have in your thesis.}
-\sweExpl{Det här avsnittet är helt enkelt för att visa ett exempel på hur du kan inkludera kod i ditt examensarbete - det här är inte ett avsnitt du skulle ha i ditt examensarbete.}
+\subsection{How the MOS-only data reaches the first stage}
 
-Listing~\ref{lst:helloWorldInC} shows an example of a simple program written
-in C code.
+The predicted dimensions $\vect{\mu}_{d,j}$ in the last term of Equation~\eqref{eq:totalLoss} are not treated as constants. When the loss is differentiated, the error on a MOS-only clip flows back through Stage~2, through the predicted dimensions into Stage~1, and into the shared encoder. In other words, the MOS-only clips push Stage~1 towards dimension values from which Stage~2 can predict MOS well. This is the mechanism by which the MOS-only data could improve the dimension predictions, as the second hypothesis suggests. The MOS-only clips also update the shared encoder directly, through the encoded features that Stage~2 receives.
 
-\begin{lstlisting}[language={C}, caption={Hello world in C code}, label=lst:helloWorldInC]
-int main() {
-printf("hello, world");
-return 0;
-}
-\end{lstlisting}
+Whether this indirect signal actually improves the dimension predictions is not given. It only constrains Stage~1 through MOS, and many different combinations of dimension values can give the same MOS. Research question RQ2 tests whether it helps in practice.
 
-\engExpl{This template uses the package \texttt{lstlistings} for many different listings. Alternatively, one could use the \texttt{minited} package together with the \texttt{listings} environment, see, for example, \href{https://www.overleaf.com/learn/latex/Code_Highlighting_with_minted}{Code Highlighting with minted}. }
+\subsection{Teacher forcing}
 
-In contrast, Listing~\ref{lst:programmes} is an example of code in Python to
-get a list of all of the programs at KTH. Note that on {\DTMsetdatestyle{iso}\DTMdisplaydate{2025}{6}{1}{-1}} the KOPPS API will no longer work.
-\engExpl{Note that the change to the iso date format was done in a group so that afterwards the date style returns to what it was, resulting in \DTMdisplaydate{2025}{6}{1}{-1}.}
+For the fully labelled clips, Stage~2 receives the true dimension values rather than Stage~1's predictions. This is \emph{teacher forcing}~\cite{williams_zipser_1989} (Section~\ref{sec:partialLabels}). It gives Stage~2 clean inputs, so it learns the relation between the dimensions and MOS without being disturbed by Stage~1's errors, which are large early in training. The cost is a mismatch between training and testing: at test time Stage~2 only ever receives predicted dimensions. Scheduled sampling~\cite{bengio_scheduled_2015}, which gradually replaces the true values with predictions during training, was tested as an alternative but did not improve the results (Section~\ref{sec:designStudyResults}), so teacher forcing was kept. The MOS-only clips already train Stage~2 on predicted dimensions, which partly reduces the mismatch.
 
-\lstset{extendedchars=true}  %% This allows character codes in the range 128-255
-\begin{lstlisting}[language={Python}, caption={Using a python program to
-    access the KTH API to get all of the programs at KTH}, label=lst:programmes]
-KOPPSbaseUrl = 'https://www.kth.se'
+\section{Inference}
+\label{sec:inference}
 
-def v1_get_programmes():
-    global Verbose_Flag
-    #
-    # Use the KOPPS API to get the data
-    # note that this returns XML
-    url = "{0}/api/kopps/v1/programme".format(KOPPSbaseUrl)
-    if Verbose_Flag:
-        print("url: " + url)
-    #
-    r = requests.get(url)
-    if Verbose_Flag:
-        print("result of getting v1 programme: {}".format(r.text))
-    #
-    if r.status_code == requests.codes.ok:
-        return r.text           # simply return the XML
-    #
-    return None
-\end{lstlisting}
-\FloatBarrier
+At test time, a clip passes through the model as a cascade. The encoder computes $\vect{h}$, Stage~1 predicts the dimensions $(\vect{\mu}_d, \vect{\Sigma}_d)$, and Stage~2 predicts MOS from $\vect{h}$ and the predicted means: $(\mu_m, \sigma_m^2) = g(\vect{h}, \vect{\mu}_d)$. The model therefore outputs a four-dimensional Gaussian over the quality dimensions and a separate one-dimensional Gaussian over MOS. The predicted means are used as the quality scores, and the variances as uncertainty estimates.
 
-In \Cref{lst:exampleUsingMinted}, line \ref{listinline:ExcelWriter} shows the use of the \texttt{ExcelWriter} function. Line \ref{listinline:UsingToexcel} writes a panda dataframe (named \texttt{comp}) to the spreadsheet, while line \ref{listinline:closingWriter} closes the open spreadsheet.
+\section{Comparison with MultiGauss}
+\label{sec:comparisonMultiGauss}
 
-\begin{listing}[!ht]
-\begin{minted}[linenos,breaklines, escapeinside=||]{python}
-import pandas as pd
-def make_spreadsheet_of_differences(pds):
-    global school
-    publishers=set()
-    writer = pd.ExcelWriter(f'/tmp/{school}_compare_duplicates.xlsx', engine='xlsxwriter') |\label{listinline:ExcelWriter}|
-    print("starting")
-    for idx, p in enumerate(pds):
-        p0=list(p)[0]
-        p1=list(p)[1]
-        print(f"\nfor {p0} and {p1}")
-        comp, publisher1, publisher2=compare_two_records_silent(p0, p1)
-        sheet_name=f'{p0}'.split(':')[1]
-        print(f'Wrote {sheet_name=}')|\label{listinline:UsingToexcel}|
-        comp.to_excel(writer, sheet_name=sheet_name)
-        publishers.add(publisher1)
-        publishers.add(publisher2)
-    
-    # Close the Pandas Excel writer and output the Excel file.
-    writer.close()|\label{listinline:closingWriter}|
-    print(f"{publishers=}")
-    return publishers
-\end{minted}
-\caption{Example of using \texttt{minted} with python code}
-\label{lst:exampleUsingMinted}
-\end{listing}
+Table~\ref{tab:twoStageVsMultiGauss} summarises how the two-stage model relates to MultiGauss. The two models share the input features, the encoder, the output mapping and the training schedule, so the comparisons in Chapter~\ref{ch:resultsAndAnalysis} isolate the effect of the output structure and the extra MOS-only data.
 
-\FloatBarrier
+\begin{table}[!ht]
+  \centering
+  \caption{The two-stage model compared with MultiGauss.}
+  \label{tab:twoStageVsMultiGauss}
+  \begin{tabular}{p{3.6cm}p{4.4cm}p{4.4cm}}
+    \toprule
+     & MultiGauss & Two-stage model \\
+    \midrule
+    Input features & \multicolumn{2}{c}{XLS-R, layer 12, frozen} \\
+    Encoder & \multicolumn{2}{c}{two convolutional layers, 32 channels} \\
+    Output & one 5-D Gaussian over all five quantities & 4-D Gaussian over the dimensions, plus a 1-D Gaussian over MOS \\
+    MOS predicted from & the encoded features & the encoded features and the predicted dimensions \\
+    Labels needed per clip & all five & all five, or MOS only \\
+    Covariance between MOS and the dimensions & modelled & not modelled \\
+    \bottomrule
+  \end{tabular}
+\end{table}
 
+The main advantage of the two-stage model is that it can learn from MOS-only clips. It also has a disadvantage. MultiGauss models the covariance between MOS and each dimension, so its output describes how their errors are related. The two-stage model predicts MOS from the dimensions instead, and its output distributions do not include this covariance. In addition, errors in the predicted dimensions are passed on to the MOS prediction, which the joint model avoids.
 
-\subsection{Some examples of figures in tikz}
-\engExpl{This section is simply to show some example of how you can draw your own figures for in your thesis - this is not a section you would have in your thesis.}
-\sweExpl{Det här avsnittet är helt enkelt för att visa ett exempel på hur du kan rita dina egna figurer i ditt examensarbete – det här är inte ett avsnitt du skulle ha i ditt examensarbete.}
+\section{Implementation}
+\label{sec:implementation}
 
-\Needspace*{5\baselineskip}
-These figures are just some examples to show that you can draw your own figures for your thesis. This has two advantages: \first you do not have to worry about copyrights -- as these are your own figures and \Second the text is now readable and not simply a picture of text -- so screen readers can read the figure's contents to someone who is listening to the contents of your thesis.
+The model was implemented in PyTorch~\cite{paszke_pytorch_2019}, building on the published MultiGauss code. All model and training settings are defined in configuration files with the gin-config library, and a copy of the configuration is stored with every trained model, so each run can be reproduced. Each experiment is kept in its own folder with its own copy of the model, training and evaluation code. Later changes therefore cannot affect earlier results.
 
-\subsubsection{Azure's Form Recognizer}
-\Cref{fig:processAnInvoice} shows the processing of key-value extraction from a PDF document using Azure's Form Recognizer. 
-
-\tikzset{
-    processBox/.style={rectangle, rounded corners, minimum width=3cm, minimum height=1cm,text centered, font=\sffamily, draw=black, fill=red!20},
-    largeBox/.style={rectangle, rounded corners, minimum width=3cm, minimum height=4cm,text centered, draw=black}
-}
-\begin{figure}[!ht]
-\resizebox{1.1\textwidth}{!}{%
-\begin{tikzpicture}
-[align=left,node distance=2cm]
-
-\node (document) [tape,tape bend top=none,draw,font=\sffamily] {PDF\\Document};
-\node (GDM) [processBox,  right=0.5cm of document] {OCR};
-\node (OCRoutput) [largeBox, right=1cm of GDM] {OCR output};
-
-\node (kvp) [tape,tape bend top=none,draw,font=\sffamily, below=0.25cm of OCRoutput.north] {key-value\\pairs};
-\node (entities) [tape,tape bend top=none,draw,font=\sffamily, above=0.35cm of OCRoutput.south] {Entities};
-\node (Manual) [processBox, right=1cm of kvp] {Analyze the extracted\\key-value pairs};
-\draw [-latex](document) --  (GDM);
-\draw [-latex](kvp) --  (Manual);
-\path[ draw
-     , -latex'] let \p1=(GDM.east), \p2=(kvp.west) in (GDM.east) -- +(0.25*\x2-0.25*\x1, \y1) -- +(0.5*\x2-0.5*\x1, \y2) -- (kvp.west);
-\path[ draw
-     , -latex'] let \p1=(GDM.east), \p2=(kvp.west), \p3=(entities.west) in (GDM.east) --  +(0.25*\x2-0.25*\x1, \y1) -- +(0.5*\x3-0.5*\x1, \y3) -- (entities.west);
-\end{tikzpicture}
-}
-\caption{The processing of key-value extraction from a PDF document using Azure's Form Recognizer}
-  \label{fig:processAnInvoice}
-\end{figure}
-\FloatBarrier
-\subsubsection{Hyper-V with Containers}
- \Cref{fig:hyperVcontainers} shows how Hyper-V deals with containers.
- 
- \tikzset{
-    container/.style={rectangle, rounded corners, minimum width=2cm, minimum height=1cm,text centered, draw=black, fill=blue!20},
-    containerization/.style={rectangle, rounded corners, minimum width=13.25cm, minimum height=1cm,text centered, draw=black, fill=blue!20},
-    hypervisor/.style={rectangle, rounded corners, minimum width=13.25cm, minimum height=1cm,text centered, draw=black, fill=red!20},
-    os/.style={rectangle, rounded corners, minimum width=13.25cm, minimum height=1cm,text centered, draw=black, fill=orange!20},
-    guestos/.style={rectangle, rounded corners, minimum width=2cm, minimum height=1cm,text centered, draw=black, fill=orange!40},
-    infrastructure/.style={rectangle, rounded corners, minimum width=13.25cm, minimum height=1cm,text centered, draw=black, fill=green!20},
-    hos/.style={rectangle, rounded corners, minimum width=6cm, minimum height=1cm,text centered, draw=black, fill=orange!20},
-    kernel/.style={rectangle, rounded corners, minimum width=6cm, minimum height=1cm,text centered, draw=black, fill=purple!20},
-    services/.style={rectangle, rounded corners, minimum width=3cm, minimum height=1cm,text centered, draw=black, fill=pink!20]}
-}
-
-\begin{figure}[ht!]
-    \centering
-\resizebox{1\textwidth}{!}{%
-\begin{tikzpicture}
-[align=center,node distance=2cm]
-
-\node (Infrastructure) [infrastructure, text width=13cm, text centered] {Infrastructure};
-\node (OS1) [hos, anchor=north west, align=left, above=1.5cm of Infrastructure.north west, anchor=north west, text width=6cm, text centered] {Host OS};
-
-\node (OS2) [hos, anchor= west, align=left, right=0.5cm of OS1.east, text width=6cm, anchor= west, text centered] {Host OS};
-
-\node (Kernel1) [kernel, anchor=north west, align=left, above=1.5cm of OS1.north east, anchor=north east, text width=3cm, text centered] {Kernel};
-
-\node (Kernel2) [kernel, anchor=north west, align=left, above=1.5cm of OS2.north east, anchor=north east, text width=3cm, text centered] {Kernel};
-
-\node (ServiceA) [container, anchor=east, above=1 cm of Kernel1.east, anchor=east] {Services};
-\node (AppA) [container,  left=0.25cm of ServiceA] {App 1};
-
-\node (ServiceB) [container, anchor=east, above=1 cm of Kernel2.east, anchor=east] {Services};
-\node (AppB) [container,  left=0.25cm of ServiceB] {App 2};
-%\node (AppC) [container,  right=0.25cm of AppB] {App 3};
-
-\draw[black,thick,dashed] ($(OS2.north west)+(-0.3,3.75)$)  rectangle ($(OS2.south east)+(0.5,-0.3)$);
-\node[text width=5cm, text=red, above=0.1cm of ServiceB] 
-    {\textbf{Container}};
-
-\draw[red,thick,dotted] ($(Kernel2.north west)+(-0.3,1.6)$)  rectangle ($(Kernel2.south east)+(0.3,-0.3)$);
-\node[text width=5cm, text=black, above=0.8cm of ServiceB] 
-    {\textbf{VM}};
-\end{tikzpicture}
-}
-    \caption{Hyper-V with containers}
-    \label{fig:hyperVcontainers}
-\end{figure}
-\FloatBarrier
-\subsubsection{\glsfmtshort{VM} versus Containers}
-\Cref{fg:vmsVersusContainers} shows a comparison of virtual machines (VMs) versus containers.
-
-\begin{figure*}[ht!]
-    \centering
-    \begin{subfigure}[t]{0.5\textwidth}
-        \centering
-\resizebox{1\textwidth}{!}{%
-\begin{tikzpicture}
-[align=left,node distance=2cm]
-
-\node (AppA) [container,align=left] {App 1};
-\node (AppB) [container,  right=0.25cm of AppA] {App 2};
-\node (AppC) [container,  right=0.25cm of AppB] {App 3};
-
-\node (GosA) [guestos,align=left,  below=0.25cm of AppA.south west,anchor=north west] {Guest OS};
-\node (GosB) [guestos,  right=0.25cm of GosA] {Guest OS};
-\node (GosC) [guestos,  right=0.25cm of GosB] {Guest OS};
-
-\draw [decoration={brace,amplitude=0.5em},decorate, ultra thick,gray, transform canvas={xshift = 0.5cm}]
-       (AppC.north -| AppC.east) -- (GosC.south -| AppC.east);
-\node[text width=5cm,  right=1cm of GosC.north east] 
-    {\textbf{VMs}};
-
-\node (Hypervisor) [hypervisor, anchor=north west, align=left, below=0.25cm of GosA.south west, anchor=north west, text width=13cm, text centered] {Hypervisor};
-
-\node (OS) [os, anchor=north west, align=left, below=0.25cm of Hypervisor.south west, anchor=north west, text width=13cm, text centered] {Host OS};
-
-\node (Infrastructure) [infrastructure, anchor=north west, align=left, below=0.25cm of OS.south west, anchor=north west, text width=13cm, text centered] {Infrastructure};
-
-
-\end{tikzpicture}
-}
-        \caption{VM}
-    \end{subfigure}%
-    ~ 
-    \begin{subfigure}[t]{0.5\textwidth}
-        \centering
-        \resizebox{1\textwidth}{!}{%
-\begin{tikzpicture}
-[align=left,node distance=2cm]
-
-\node (AppA) [container,align=left] {App 1};
-\node (AppB) [container,  right=0.25cm of AppA] {App 2};
-\node (AppC) [container,  right=0.25cm of AppB] {App 3};
-\node[text width=5cm,  right=0.25cm of AppC] 
-    {\textbf{Apps running in Containers}};
-
-
-\node (Containerization) [containerization, anchor=north west, align=left, below=0.25cm of AppA.south west, anchor=north west, text width=13cm, text centered] {Docker Engine};
-
-\node (OS) [os, anchor=north west, align=left, below=0.25cm of Containerization.south west, anchor=north west, text width=13cm, text centered] {Host OS};
-
-\node (Infrastructure) [infrastructure, anchor=north west, align=left, below=0.25cm of OS.south west, anchor=north west, text width=13cm, text centered] {Infrastructure};
-
-
-\end{tikzpicture}
-}
-        \caption{Containers}
-    \end{subfigure}
-    \caption{Virtual machines (VMs) versus Containers}
-    \label{fg:vmsVersusContainers}
-\end{figure*}
+The XLS-R features were computed once and stored, and the training data is held in memory during training. Training was run on a computing cluster with NVIDIA GH200 GPUs, one GPU per run. One training run of the two-stage model took between about 35 and 85 minutes, depending on the amount of data. The central part of the training code, one training step, is given in Appendix~\ref{app:trainingStep}.
 
 \cleardoublepage
 \chapter{Results and Analysis}
@@ -1784,6 +1657,54 @@ xxxx.
 \cleardoublepage
 \appendix
 \renewcommand{\chaptermark}[1]{\markboth{Appendix \thechapter\relax:\thinspace\relax#1}{}}
+\chapter{Training step of the two-stage model}
+\label{app:trainingStep}
+
+The listing below shows one training step of the two-stage model, corresponding to Equation~\eqref{eq:totalLoss}. It is taken from the training code used for the experiments, with code for options not used in this thesis removed. \texttt{labelled} is a batch of fully labelled clips and \texttt{mos\_only} a batch of MOS-only clips.
+
+\begin{lstlisting}[language=Python, basicstyle=\ttfamily\footnotesize, breaklines=true, frame=single, columns=fullflexible]
+def multivariate_gnll(means, targets, covariance, eps=1e-6):
+    """Multivariate Gaussian negative log-likelihood (Stage 1).
+    As in the MultiGauss code, the log-determinant is floored at eps."""
+    log_det = torch.maximum(torch.logdet(covariance),
+                            torch.tensor(eps, device=means.device))
+    diff = (means - targets).unsqueeze(-1)
+    mahalanobis = diff.transpose(1, 2) @ torch.inverse(covariance) @ diff
+    return torch.mean(mahalanobis.squeeze() / 2 + log_det / 2)
+
+def univariate_gnll(means, targets, variance, eps=1e-6):
+    """Univariate Gaussian negative log-likelihood (Stage 2)."""
+    variance = torch.clamp(variance.reshape(-1), min=eps)
+    diff = means.reshape(-1) - targets.reshape(-1)
+    return torch.mean(torch.log(2 * torch.pi * variance) / 2
+                      + diff.pow(2) / (2 * variance))
+
+def train_step(model, optimizer, labelled, mos_only):
+    # Fully labelled clips: label columns are [mos, noi, col, dis, loud].
+    features, labels = labelled
+    mos_targets, dim_targets = labels[:, 0], labels[:, 1:5]
+
+    encoded = model.projection_head.encode(features)       # shared encoder
+    dim_means, dim_cov = model.projection_head.decode(encoded)  # Stage 1
+    # Stage 2 with teacher forcing: true dimension values as input.
+    mos_means, mos_var = model.mos_head(encoded, dim_targets)
+
+    loss = multivariate_gnll(dim_means, dim_targets, dim_cov)  # dimensions
+    loss = loss + univariate_gnll(mos_means, mos_targets, mos_var)  # MOS
+
+    # MOS-only clips: full cascade, Stage 2 gets Stage 1's predictions.
+    # The predictions are not detached, so this loss also trains Stage 1.
+    features_m, mos_targets_m = mos_only
+    (mos_means_m, mos_var_m), _ = model(features_m)
+    loss = loss + univariate_gnll(mos_means_m, mos_targets_m, mos_var_m)
+
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+    return loss.item()
+\end{lstlisting}
+
+\cleardoublepage
 \chapter{Supporting materials}
 \label{sec:supportingMaterial}
 \generalExpl{Here is a place to add supporting material that can help others build upon your work. You can include files as attachments to the PDF file or indirectly via URLs. Alternatively, consider adding supporting material uploaded as separate files in DiVA.}
