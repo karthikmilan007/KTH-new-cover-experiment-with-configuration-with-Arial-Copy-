@@ -849,7 +849,15 @@ The two-stage model rests on the assumption that MOS depends on the four quality
 
 Each dimension correlates positively with MOS, so when the rating of a dimension goes up or down, MOS tends to follow. Together, the four dimensions explain 87\,\% of the MOS variance in the simulated training set and 76\,\% in the live set, using only a linear combination. The relation is weaker for the live calls, where degradations are more varied and the labels are noisier. The part of MOS that the four dimensions do not explain is one reason why the MOS stage of the two-stage model also receives the speech features (Chapter~\ref{ch:whatYouDid}).
 
-Table~\ref{tab:mosDimCorrelation} also shows that the dimensions are related to MOS, but not interchangeable with it. The dimensions correlate less with each other than with MOS (for example, 0.39 between NOI and DIS in the simulated set), which confirms that they capture different types of degradation.
+Table~\ref{tab:mosDimCorrelation} and Figure~\ref{fig:mosDimCorrelation} also show that the dimensions are related to MOS, but not interchangeable with it. The dimensions correlate less with each other than with MOS (for example, 0.39 between NOI and DIS in the simulated set), which confirms that they capture different types of degradation.
+
+\begin{figure}[!ht]
+  \centering
+  \includegraphics[width=\textwidth]{figures/thesis/mos_dim_correlation.pdf}
+  \caption{Pearson correlation between MOS and the four quality dimensions, and between the dimensions themselves, in the two NISQA training sets.}
+  \label{fig:mosDimCorrelation}
+\end{figure}
+
 
 \section{Objective speech quality models}
 \label{sec:objectiveModels}
@@ -937,7 +945,7 @@ This chapter describes how the research questions were investigated. Section~\re
 \section{Research process}
 \label{sec:researchProcess}
 
-The work followed five steps:
+The work followed the five steps shown in Figure~\ref{fig:researchProcess}:
 \begin{enumerate}
 \item \textbf{Reproduce the baseline.} The published MultiGauss model was evaluated with the same features and evaluation code as all later models, to confirm that the pipeline reproduces the published results.
 \item \textbf{Build the two-stage model.} The model was designed so that MOS-only clips can train it together with fully labelled clips (Chapter~\ref{ch:whatYouDid}).
@@ -945,6 +953,13 @@ The work followed five steps:
 \item \textbf{Main experiments.} The final two-stage model was compared with the baselines in two experiments, one with a separate MOS-only corpus and one with a MOS-only subset of the same corpus.
 \item \textbf{Statistical evaluation.} The differences between models were tested for significance, to separate real effects from training randomness.
 \end{enumerate}
+
+\begin{figure}[!ht]
+  \centering
+  \includegraphics[width=\textwidth]{figures/thesis/research_process.pdf}
+  \caption{The research process followed in this thesis.}
+  \label{fig:researchProcess}
+\end{figure}
 
 \section{Datasets}
 \label{sec:datasets}
@@ -974,7 +989,14 @@ The NISQA corpus~\cite{mittag_nisqa_2021} is the source of all multidimensional 
 
 The \emph{simulated} parts (SIM) were created by passing clean speech through simulated transmission and processing, such as codecs, packet loss, noise, filtering and level changes, so they cover a wide range of quality. The \emph{live} parts (LIVE) are real calls made over Skype and from landlines to mobile phones. The 1\,020 LIVE training clips come from 495 different source recordings.
 
-The SIM and LIVE parts have quite different label distributions, which is important for Experiment~B (Section~\ref{sec:expB}). Table~\ref{tab:simLiveStats} compares the two training sets. The LIVE clips are rated clearly lower than the SIM clips for MOS, coloration and loudness, and they span a narrower range of scores. Fewer than 1\,\% of the LIVE clips have a MOS of 4 or higher, compared with about 25\,\% of the SIM clips. Discontinuity is the only dimension with a similar distribution in both parts. A narrow range of true scores also makes correlation-based metrics lower, so scores on LIVE data are expected to be lower than on SIM data for every model.
+The SIM and LIVE parts have quite different label distributions, which is important for Experiment~B (Section~\ref{sec:expB}). Table~\ref{tab:simLiveStats} and Figure~\ref{fig:simLiveDistributions} compare the two training sets. The LIVE clips are rated clearly lower than the SIM clips for MOS, coloration and loudness, and they span a narrower range of scores. Fewer than 1\,\% of the LIVE clips have a MOS of 4 or higher, compared with about 25\,\% of the SIM clips. Discontinuity is the only dimension with a similar distribution in both parts. A narrow range of true scores also makes correlation-based metrics lower, so scores on LIVE data are expected to be lower than on SIM data for every model.
+
+\begin{figure}[!ht]
+  \centering
+  \includegraphics[width=\textwidth]{figures/thesis/sim_live_distributions.pdf}
+  \caption{Distribution of the labels in the two NISQA training sets. The black bar spans the middle 50\,\% of the clips (interquartile range), and the white dot marks the median.}
+  \label{fig:simLiveDistributions}
+\end{figure}
 
 \begin{table}[!ht]
   \centering
@@ -1056,6 +1078,16 @@ Unless stated otherwise, all models in this thesis share the following settings.
 
 \subsection{Experiment A: adding a separate MOS-only corpus}
 \label{sec:expA}
+
+Figure~\ref{fig:experimentsAB} gives an overview of the training and evaluation data in the two main experiments.
+
+\begin{figure}[!ht]
+  \centering
+  \includegraphics[width=\textwidth]{figures/thesis/experiments_ab.pdf}
+  \caption{The training data of each model in Experiments A and B, and the data they are evaluated on.}
+  \label{fig:experimentsAB}
+\end{figure}
+
 
 Experiment~A tests whether a MOS-only corpus recorded and rated separately from the multidimensional corpus helps the model. This is the realistic case: in practice, extra MOS-only data will come from a different test, with different listeners and conditions.
 \begin{itemize}
@@ -1139,26 +1171,8 @@ The structure also makes it possible to test the second hypothesis of this thesi
 
 \begin{figure}[!ht]
   \centering
-  \begin{tikzpicture}[
-      box/.style={draw, rounded corners, align=center, minimum height=1.0cm, text width=2.6cm, font=\small},
-      out/.style={draw, dashed, rounded corners, align=center, minimum height=1.0cm, text width=2.4cm, font=\small},
-      arr/.style={->, thick},
-      node distance=0.9cm and 0.8cm
-    ]
-    \node[box] (feat) {XLS-R features\\(layer 12)};
-    \node[box, right=of feat] (enc) {Shared\\convolutional\\encoder};
-    \node[box, above right=0.3cm and 0.8cm of enc] (s1) {Stage 1:\\dimension stage};
-    \node[box, below right=0.3cm and 0.8cm of enc] (s2) {Stage 2:\\MOS stage};
-    \node[out, right=of s1] (o1) {4-D Gaussian\\NOI, COL, DIS, LOUD};
-    \node[out, right=of s2] (o2) {1-D Gaussian\\MOS};
-    \draw[arr] (feat) -- (enc);
-    \draw[arr] (enc.east) -- ++(0.35,0) |- (s1.west);
-    \draw[arr] (enc.east) -- ++(0.35,0) |- node[pos=0.75, below, font=\footnotesize] {encoded features} (s2.west);
-    \draw[arr] (s1) -- (o1);
-    \draw[arr] (s2) -- (o2);
-    \draw[arr] (s1.south) -- node[right, font=\footnotesize, align=left] {dimension values} (s2.north);
-  \end{tikzpicture}
-  \caption{The two-stage model. The shared encoder processes the XLS-R features once. Stage~1 predicts a Gaussian over the four quality dimensions, and Stage~2 predicts MOS from the encoded features and the four dimension values. During training, Stage~2 receives the true dimension values for fully labelled clips and Stage~1's predictions for MOS-only clips. At test time it always receives Stage~1's predictions.}
+  \includegraphics[width=\textwidth]{figures/thesis/two_stage_model.pdf}
+  \caption{The two-stage model. The shared encoder processes the XLS-R features once. Stage~1 predicts a Gaussian over the four quality dimensions, and Stage~2 predicts MOS from the encoded features $\vect{h}$ and the four dimension values $\vect{q}$. During training, Stage~2 receives the true dimension values for fully labelled clips and Stage~1's predictions for MOS-only clips; for the MOS-only clips, the MOS error also flows back into Stage~1 (dashed arrow). At test time, Stage~2 always receives Stage~1's predictions.}
   \label{fig:twoStageModel}
 \end{figure}
 
