@@ -1149,7 +1149,7 @@ Several measures were taken to make the results reliable and the comparisons fai
 \item All models use the same features, the same evaluation code and, where they are trained in this thesis, the same training schedule.
 \item The evaluation pipeline was checked against the published MultiGauss results.
 \item Every configuration was trained three times, and differences were tested for significance rather than judged from the means.
-\item The test sets were never used for any decision: neither for selecting checkpoints, nor for choosing hyperparameters.
+\item The test sets were never used for selecting checkpoints or for choosing hyperparameters in the tuning. The early design studies report test-set results, but none of them changed the default configuration (Section~\ref{sec:designStudyResults}).
 \end{itemize}
 
 The method also has limitations. The checkpoint of every model is selected on NISQA validation MOS, so results on the validation sets are slightly optimistic, for the baselines and the two-stage model alike. The test sets are not affected, so the main conclusions are drawn from them where possible. Three runs per configuration give a rough estimate of the training variation, and small differences may go undetected. Finally, NISQA and PSTN are the only multidimensional and MOS-only training corpora used, so the conclusions may not carry over unchanged to other corpora.
@@ -1300,263 +1300,249 @@ The XLS-R features were computed once and stored, and the training data is held 
 \cleardoublepage
 \chapter{Results and Analysis}
 \label{ch:resultsAndAnalysis}
-\sweExpl{svensk: Resultat och Analys}
 
-\engExpl{Sometimes this is split into two chapters.\\Keep in mind: How you are going to evaluate what you have done? What are your metrics?\\Analysis of your data and proposed solution\\Does this meet the goals which you had when you started?}
+This chapter presents the results. Section~\ref{sec:designStudyResults} reports the design studies that led to the final configuration of the two-stage model. Sections~\ref{sec:resultsExpA} and~\ref{sec:resultsExpB} report the two main experiments, and Section~\ref{sec:resultsMasked} compares the two-stage model with the masked-loss baseline. Section~\ref{sec:resultsTuning} reports the hyperparameter tuning, and Section~\ref{sec:resultsCalibration} looks at the absolute accuracy of the predictions. Sections~\ref{sec:reliabilityAnalysis} and~\ref{sec:validityAnalysis} discuss how reliable and valid the results are.
 
-In this chapter, we present the results and discuss them.
+Unless stated otherwise, all numbers are Pearson correlation coefficients (PCC) between predicted and true scores, averaged over three training runs. Differences marked with an asterisk ($^{*}$) are statistically significant (hierarchical bootstrap, Holm-corrected $p < 0.05$, Section~\ref{sec:evaluation}). \emph{Avg.} is the average PCC over the five quantities.
 
-\sweExpl{I detta kapitel presenterar vi resultaten och diskutera dem.\\Ibland delas detta upp i två kapitel.\\Hur du ska utvärdera vad du har gjort? Vad är din statistik?\\Analys av data och föreslagen lösning\\Innebär detta att uppfyllelse av de mål som du hade när du började?}
+\section{Design studies}
+\label{sec:designStudyResults}
 
-\section{Major results}
-\sweExpl{Huvudsakliga resultat}
+The design studies were carried out in the setting of Experiment~A (NISQA and PSTN), unless noted otherwise, and are evaluated on the three NISQA test sets pooled together. They were run before the final evaluation protocol was fixed, which is why they report test-set results. None of them led to a change from the default configuration, which was taken from MultiGauss where possible, so the use of the test sets here does not favour the two-stage model in the main comparisons.
 
-Some statistics of the delay measurements are shown in Table~\ref{tab:delayMeasurements}.
-The delay has been computed from the time the GET request is received until the response is sent.
+\subsection{Structure of the MOS stage}
 
-\sweExpl{Lite statistik av fördröjningsmätningarna visas i Tabell~\ref{tab:delayMeasurements}. Förseningen har beräknats från den tidpunkt då begäran GET tas emot fram till svaret skickas.}
+A MOS stage that receives only the four dimension values reached a MOS PCC of 0.919 on the pooled test sets (one training run). The final MOS stage, which also receives the encoded features, reached 0.917 (three runs). Adding the encoded features therefore did not change MOS prediction.
+
+The same study gives direct support for the assumption behind the two-stage model. When the MOS stage was given the \emph{true} dimension values of the test clips instead of the predicted ones, its MOS PCC rose to 0.961, compared with 0.915 when it received Stage~1's predictions (one training run). MOS can therefore be predicted very accurately from the four dimensions, and most of the remaining error in the cascade comes from errors in the predicted dimensions. Loudness is the weakest of them, with a PCC of only about 0.61 on the pooled test sets.
+
+\subsection{Teacher forcing or scheduled sampling}
+
+Table~\ref{tab:scheduledSampling} compares teacher forcing with scheduled sampling. The differences are at most 0.010 and in both directions, and the average over the five quantities changes by only 0.003. Scheduled sampling therefore gave no clear benefit, and the simpler teacher forcing was kept.
 
 \begin{table}[!ht]
-  \begin{center}
-    \caption{Delay measurement statistics}
-    \label{tab:delayMeasurements}
-    \begin{tabular}{l|S[table-format=4.2]|S[table-format=3.2]} % <-- Alignments: 1st column left, 2nd middle and 3rd right, with vertical lines in between
-      \textbf{Configuration} & \textbf{Average delay (ns)} & \textbf{Median delay (ns)}\\
-      \hline
-      1 & 467.35 & 450.10\\
-      2 & 1687.5 & 901.23\\
-    \end{tabular}
-  \end{center}
+  \centering
+  \caption{Teacher forcing compared with scheduled sampling. PCC on the pooled NISQA test sets, mean of three runs.}
+  \label{tab:scheduledSampling}
+  \begin{tabular}{lcccccc}
+    \toprule
+    Training of Stage 2 & MOS & NOI & COL & DIS & LOUD & Avg. \\
+    \midrule
+    Teacher forcing     & 0.917 & 0.839 & 0.880 & 0.886 & 0.607 & 0.826 \\
+    Scheduled sampling  & 0.917 & 0.835 & 0.885 & 0.891 & 0.617 & 0.829 \\
+    \bottomrule
+  \end{tabular}
 \end{table}
 
-Table \ref{tab:ping_results} shows the measurement of round trip times from four hosts to and from a server.
-\begin{table}[ht!]
-\caption[RTT for 4 hosts]{Result for the ping measurements of RTT for 4 hosts} 
-\label{tab:ping_results}
-\vspace{1em}
-\centering
-\begin{tabular}{l *{4}{S[table-format=2.3]}}
-{} & \multicolumn{4}{c}{host to server RTT in ms} \\
-\cmidrule{2-5}
-Host & \multicolumn{1}{c}{min}  & \multicolumn{1}{c}{avg} & \multicolumn{1}{c}{max} & \multicolumn{1}{c}{mdev} \\
-\midrule
-h1 & 5.625 & 5.625 & 5.625 & 0.0 \\
-h2 & 2.909 & 2.909 & 1.909 & 0.0 \\
-h3 & 5.007 & 5.007 & 5.007 & 0.0 \\
-h4 & 2.308 & 2.308 & 2.308 & 0.0 \\
-\midrule
-\end{tabular}
-\end{table}
-\FloatBarrier
+\subsection{Batch ratio}
 
-\sweExpl{Fördröj mätstatistik}
-\sweExpl{Konfiguration | Genomsnittlig fördröjning (ns) | Median fördröjning (ns)}
-
-Figure \ref{fig:processing_vs_payload_length} shows an example of the performance as measured in the experiments.
+Figure~\ref{fig:batchRatio}(a) shows how the share of PSTN clips in a 64-clip batch affects the results on the NISQA test sets. Across the whole range, from 11 to 48 PSTN clips per batch, MOS PCC stays between 0.909 and 0.916, and the average over the five quantities between 0.825 and 0.828. These variations are within the run-to-run variation. In the Experiment~B setting (Figure~\ref{fig:batchRatio}b), the share of LIVE clips also makes little difference. MOS PCC on NISQA\_VAL\_LIVE is between 0.856 and 0.868 at every ratio, well above MultiGauss trained on SIM only (0.794). This holds even when the batch contains only a single LIVE clip. The average over the five quantities on the test sets stays between 0.821 and 0.825, slightly below MultiGauss (0.831). Since the ratio has no clear effect, a balanced batch of 32 and 32 clips was used in all further experiments.
 
 \begin{figure}[!ht]
-% GNUPLOT: LaTeX picture
-\setlength{\unitlength}{0.240900pt}
-\ifx\plotpoint\undefined\newsavebox{\plotpoint}\fi
-\begin{picture}(1500,900)(0,0)
-\sbox{\plotpoint}{\rule[-0.200pt]{0.400pt}{0.400pt}}%
-\put(171.0,131.0){\rule[-0.200pt]{4.818pt}{0.400pt}}
-\put(151,131){\makebox(0,0)[r]{ 1.5}}
-\put(1419.0,131.0){\rule[-0.200pt]{4.818pt}{0.400pt}}
-\put(171.0,212.0){\rule[-0.200pt]{4.818pt}{0.400pt}}
-\put(151,212){\makebox(0,0)[r]{ 2}}
-\put(1419.0,212.0){\rule[-0.200pt]{4.818pt}{0.400pt}}
-\put(171.0,292.0){\rule[-0.200pt]{4.818pt}{0.400pt}}
-\put(151,292){\makebox(0,0)[r]{ 2.5}}
-\put(1419.0,292.0){\rule[-0.200pt]{4.818pt}{0.400pt}}
-\put(171.0,373.0){\rule[-0.200pt]{4.818pt}{0.400pt}}
-\put(151,373){\makebox(0,0)[r]{ 3}}
-\put(1419.0,373.0){\rule[-0.200pt]{4.818pt}{0.400pt}}
-\put(171.0,454.0){\rule[-0.200pt]{4.818pt}{0.400pt}}
-\put(151,454){\makebox(0,0)[r]{ 3.5}}
-\put(1419.0,454.0){\rule[-0.200pt]{4.818pt}{0.400pt}}
-\put(171.0,534.0){\rule[-0.200pt]{4.818pt}{0.400pt}}
-\put(151,534){\makebox(0,0)[r]{ 4}}
-\put(1419.0,534.0){\rule[-0.200pt]{4.818pt}{0.400pt}}
-\put(171.0,615.0){\rule[-0.200pt]{4.818pt}{0.400pt}}
-\put(151,615){\makebox(0,0)[r]{ 4.5}}
-\put(1419.0,615.0){\rule[-0.200pt]{4.818pt}{0.400pt}}
-\put(171.0,695.0){\rule[-0.200pt]{4.818pt}{0.400pt}}
-\put(151,695){\makebox(0,0)[r]{ 5}}
-\put(1419.0,695.0){\rule[-0.200pt]{4.818pt}{0.400pt}}
-\put(171.0,776.0){\rule[-0.200pt]{4.818pt}{0.400pt}}
-\put(151,776){\makebox(0,0)[r]{ 5.5}}
-\put(1419.0,776.0){\rule[-0.200pt]{4.818pt}{0.400pt}}
-\put(171.0,131.0){\rule[-0.200pt]{0.400pt}{4.818pt}}
-\put(171,90){\makebox(0,0){ 0}}
-\put(171.0,756.0){\rule[-0.200pt]{0.400pt}{4.818pt}}
-\put(298.0,131.0){\rule[-0.200pt]{0.400pt}{4.818pt}}
-\put(298,90){\makebox(0,0){ 10}}
-\put(298.0,756.0){\rule[-0.200pt]{0.400pt}{4.818pt}}
-\put(425.0,131.0){\rule[-0.200pt]{0.400pt}{4.818pt}}
-\put(425,90){\makebox(0,0){ 20}}
-\put(425.0,756.0){\rule[-0.200pt]{0.400pt}{4.818pt}}
-\put(551.0,131.0){\rule[-0.200pt]{0.400pt}{4.818pt}}
-\put(551,90){\makebox(0,0){ 30}}
-\put(551.0,756.0){\rule[-0.200pt]{0.400pt}{4.818pt}}
-\put(678.0,131.0){\rule[-0.200pt]{0.400pt}{4.818pt}}
-\put(678,90){\makebox(0,0){ 40}}
-\put(678.0,756.0){\rule[-0.200pt]{0.400pt}{4.818pt}}
-\put(805.0,131.0){\rule[-0.200pt]{0.400pt}{4.818pt}}
-\put(805,90){\makebox(0,0){ 50}}
-\put(805.0,756.0){\rule[-0.200pt]{0.400pt}{4.818pt}}
-\put(932.0,131.0){\rule[-0.200pt]{0.400pt}{4.818pt}}
-\put(932,90){\makebox(0,0){ 60}}
-\put(932.0,756.0){\rule[-0.200pt]{0.400pt}{4.818pt}}
-\put(1059.0,131.0){\rule[-0.200pt]{0.400pt}{4.818pt}}
-\put(1059,90){\makebox(0,0){ 70}}
-\put(1059.0,756.0){\rule[-0.200pt]{0.400pt}{4.818pt}}
-\put(1185.0,131.0){\rule[-0.200pt]{0.400pt}{4.818pt}}
-\put(1185,90){\makebox(0,0){ 80}}
-\put(1185.0,756.0){\rule[-0.200pt]{0.400pt}{4.818pt}}
-\put(1312.0,131.0){\rule[-0.200pt]{0.400pt}{4.818pt}}
-\put(1312,90){\makebox(0,0){ 90}}
-\put(1312.0,756.0){\rule[-0.200pt]{0.400pt}{4.818pt}}
-\put(1439.0,131.0){\rule[-0.200pt]{0.400pt}{4.818pt}}
-\put(1439,90){\makebox(0,0){ 100}}
-\put(1439.0,756.0){\rule[-0.200pt]{0.400pt}{4.818pt}}
-\put(171.0,131.0){\rule[-0.200pt]{0.400pt}{155.380pt}}
-\put(171.0,131.0){\rule[-0.200pt]{305.461pt}{0.400pt}}
-\put(1439.0,131.0){\rule[-0.200pt]{0.400pt}{155.380pt}}
-\put(171.0,776.0){\rule[-0.200pt]{305.461pt}{0.400pt}}
-\put(30,453){\rotatebox{-270}{\makebox(0,0){Processing time (ms)}}}
-\put(805,29){\makebox(0,0){Payload size (bytes)}}
-\put(868.0,131.0){\rule[-0.200pt]{0.400pt}{84.074pt}}
-\put(995.0,131.0){\rule[-0.200pt]{0.400pt}{98.287pt}}
-\put(1173.0,131.0){\rule[-0.200pt]{0.400pt}{118.041pt}}
-\put(1325.0,131.0){\rule[-0.200pt]{0.400pt}{134.904pt}}
-\put(1350.0,131.0){\rule[-0.200pt]{0.400pt}{137.795pt}}
-\put(1439.0,131.0){\rule[-0.200pt]{0.400pt}{155.380pt}}
-\end{picture}
-\caption[A GNUplot figure]{Processing time vs. payload length}\vspace{0.5cm}
-\label{fig:processing_vs_payload_length}
+  \centering
+  \includegraphics[width=\textwidth]{figures/thesis/batch_ratio.pdf}
+  \caption{Effect of the share of MOS-only clips in a 64-clip training batch. (a) Experiment~A setting: NISQA with PSTN, evaluated on the pooled NISQA test sets. (b) Experiment~B setting: NISQA\_TRAIN\_SIM with NISQA\_TRAIN\_LIVE as MOS-only data. Dashed lines show MultiGauss. Mean of three runs at each point.}
+  \label{fig:batchRatio}
 \end{figure}
-\FloatBarrier		
 
-Given these measurements, we can calculate our processing bit rate as the inverse of the time it takes to process an additional byte divided by 8 bits per byte:
+\subsection{Equal amounts of data}
 
-\[
-	\text{bit rate} = \frac{1}{\frac{\text{time}_{\text{byte}}}{8}} = 20.03 \quad kb/s
-\] 
+Two further checks were made in the Experiment~B setting, to rule out simple explanations for the results in Section~\ref{sec:resultsExpB}. First, the first stage of the two-stage model sees only 32 fully labelled clips per step, while MultiGauss sees 64. With 64 SIM and 64 LIVE clips per step, so that both models see the same number of fully labelled clips, the results were practically unchanged: the average over the five quantities on the test sets was 0.818 (MultiGauss 0.831), and the MOS gain on NISQA\_VAL\_LIVE remained (+0.072$^{*}$).
 
-\Cref{tab:majorMarkupLMDetailedResult} shows another table in which some values have been set in bold (using \textbackslash B) to emphasize them. Note how the \texttt{S} formatting has been modified so that it considers the weight of the characters and this is able to decimal align even these hold-faced numbers with the numbers in the column above them.
+Second, in the main setting the 1\,020 LIVE clips are repeated about ten times more often than the 10\,000 SIM clips. With equal pools of 1\,020 SIM and 1\,020 LIVE clips, compared with MultiGauss trained on the same 1\,020 SIM clips, the pattern was the same. MOS improved on NISQA\_VAL\_LIVE (0.861 against 0.772, $+0.089^{*}$) and on the pooled validation sets ($+0.008^{*}$), while the average over the five quantities on the test sets did not improve (0.784 against 0.792, not significant).
+
+\subsection{Amount of multidimensional data}
+
+The low-data study tests the situation that motivates this thesis: little multidimensional data, with MOS-only data to make up for it. Out of a budget of 500 clips, a varying number came from NISQA with all five labels and the rest from PSTN with MOS only. MultiGauss was trained on exactly the same NISQA clips, but cannot use the PSTN clips. Figure~\ref{fig:lowData} shows the results.
+
+With the same fully labelled clips, the two-stage model predicted MOS better than MultiGauss at six of the seven data sizes, by 0.014 to 0.027 PCC (Figure~\ref{fig:lowData}a). The gain is largest when the multidimensional data is scarcest: with only 100 NISQA clips, the two-stage model reached 0.855 against 0.828. However, the run-to-run variation at this data size is large (standard deviation 0.01--0.04), so the individual differences are uncertain. The dimension predictions did not benefit (Figure~\ref{fig:lowData}b). The average over the five quantities was lower than MultiGauss at every data size, by 0.009 to 0.037, because the four dimensions were predicted worse.
+
+A related study kept 500 NISQA clips fixed and added 200 to 1\,000 PSTN clips. MOS PCC rose from 0.871 to 0.880, compared with 0.864 for MultiGauss on the same 500 NISQA clips. The average over the five quantities stayed between 0.754 and 0.763, again below MultiGauss (0.773).
+
+\begin{figure}[!ht]
+  \centering
+  \includegraphics[width=\textwidth]{figures/thesis/low_data.pdf}
+  \caption{Low-data study. Both models are trained on the same fully labelled NISQA clips; the two-stage model additionally receives PSTN clips with MOS labels, up to a total of 500 clips. PCC on the pooled NISQA test sets, mean of three runs; error bars in (a) show the standard deviation over runs.}
+  \label{fig:lowData}
+\end{figure}
+
+\subsection{XLS-R layer}
+
+Table~\ref{tab:sslLayer} compares features from three XLS-R layers, each at three batch ratios (single runs). Layer~12 gave the best MOS prediction on the NISQA test sets at every ratio, and its PSTN results were on par with the deeper layers. Layer~12, which is also the layer used by MultiGauss~\cite{cumlin_multigauss_2025}, was therefore kept.
 
 \begin{table}[!ht]
-    \centering
-    \caption{Median values of sandwich attributes}
-    \label{tab:majorMarkupLMDetailedResult}
-    \begin{tabular}{l *{2}{S[detect-weight,mode=text,table-format=3.2]}}
-        & \multicolumn{2}{c}{\textbf{sites}}\\
-        \cmidrule{2-3}
-        \textbf{Attribute} & \textbf{A} & \textbf{B} \\
-        \midrule
-        price (in SEK) & 36.5 & 71.3 \\
-        protean (g) & 97.2 & 100.0 \\
-        salt (mg) & 9.7 & 9.3 \\
-        \hline
-        \textbf{Average customer rating in \%} & \B 82.2 & \B 89.9 \\
-        \midrule
-    \end{tabular}
+  \centering
+  \caption{MOS PCC for features from three XLS-R layers, at three shares of NISQA clips in the batch, on the pooled NISQA test sets and on PSTN\_VAL2K. Single training runs.}
+  \label{tab:sslLayer}
+  \begin{tabular}{lcccccc}
+    \toprule
+     & \multicolumn{3}{c}{NISQA test sets} & \multicolumn{3}{c}{PSTN\_VAL2K} \\
+    \cmidrule(lr){2-4}\cmidrule(lr){5-7}
+    NISQA share of batch & 20\,\% & 50\,\% & 80\,\% & 20\,\% & 50\,\% & 80\,\% \\
+    \midrule
+    Layer 12 & \textbf{0.909} & \textbf{0.896} & \textbf{0.900} & \textbf{0.804} & 0.783 & 0.803 \\
+    Layer 22 & 0.880 & 0.868 & 0.877 & 0.779 & \textbf{0.808} & 0.805 \\
+    Layer 32 & 0.872 & 0.871 & 0.858 & 0.788 & 0.793 & \textbf{0.810} \\
+    \bottomrule
+  \end{tabular}
 \end{table}
-\FloatBarrier
 
+\subsection{Summary of the design studies}
 
-\Needspace*{4\baselineskip}
-\Cref{fig:stackedrust} shows a stacked bar chart using pgfplots. It illustrates how easy it is to take a set of data and make a stacked bar plot. One of the features is the shifted values -- this is very useful when the bar itself is too small to put the value into.
+The final two-stage model uses XLS-R layer~12, a MOS stage that receives both the encoded features and the dimension values, teacher forcing, and a balanced batch of 32 fully labelled and 32 MOS-only clips. None of the design choices studied had a large effect. Across all studies, the same pattern appears: the MOS-only data helps MOS, but not the four dimensions.
 
-\pgfplotstableread{
-Label Numbers  Refs  Struct/Enum  Heap  Arrays
-cratesio 70.04 19.83 8.31 1.3 0.52
-librs 49.26 30.49 10.80 7.92 1.53
-rustc 55.01 24.80 11.54 6.16 2.49
-}\testdata
+\section{Experiment A: adding a separate MOS-only corpus}
+\label{sec:resultsExpA}
 
+Table~\ref{tab:expAMix} shows MOS prediction on the combined set of 2\,000 NISQA validation clips and 2\,000 PSTN validation clips. On the combined set, the two-stage model reached a PCC of 0.882, against 0.846 for MultiGauss, a significant improvement of 0.036. It also predicted the PSTN clips significantly better (0.818 against 0.801). On the NISQA half, MultiGauss was slightly better (0.923 against 0.919); the difference of 0.004 is small but significant.
 
-\pgfkeys{
-    /pgf/number format/.cd,
-    fixed,
-    fixed zerofill,
-    precision=2
-}
-\begin{figure}[ht!]
-    \centering
-    \scalebox{0.9}{
-    \begin{tikzpicture}
-    \begin{axis}[
-        ybar stacked,
-        %reverse legend,
-        reverse legend=false,
-        %https://tex.stackexchange.com/questions/88892/pgfplots-bar-plot-spacing-inbetween-bars
-        enlarge x limits=0.4,
-	    bar width=45pt,
-        /pgfplots/nodes near coords*/.append style={
-        every node near coord/.style={
-            color=black,
-            font=\small,
-            name=X,
-%            shift={    
-%                (50pt,25pt)
-%                },
-            xshift={50pt},
-                yshift ={
-                ifthenelse((\plotnum == 4), 30pt,20pt)},
-            },
-            scatter/@post marker code/.append code={
-                \node(Y){};
-                \draw(X)--(Y.center);
-            }
-        },
-	    nodes near coords,
-        bar shift=5pt,
-        ymin=0,
-        ymax=115,
-        xtick=data,
-        width=1\textwidth,
-        legend style={draw=none},
-        legend image post style={scale=2.0},
-        legend style={
-            at={(0.5,-0.2)},
-            anchor=north,
-            legend columns=-2,
-            font=\large,
-            %mark size=20pt,
-        },
-        ylabel=Percentage points (\%),
-        xticklabels from table={\testdata}{Label},
-        xticklabel style={rotate=30},
-    ]
-    \addplot  table [y=Numbers, meta=Label, x expr=\coordindex] {\testdata};
-    \addlegendentry{Numbers}
-    \addplot table [y=Refs, meta=Label, x expr=\coordindex] {\testdata};
-    \addlegendentry{Refs}
-    \addplot  table [y=Struct/Enum, meta=Label, x expr=\coordindex] {\testdata};
-    \addlegendentry{Struct/Enum}
-    \addplot  table [y=Heap, meta=Label, x expr=\coordindex] {\testdata};
-    \addlegendentry{Heap}
-    \addplot  table [y=Arrays, meta=Label, x expr=\coordindex] {\testdata};
-    \addlegendentry{Arrays}
-    \end{axis}
-    \end{tikzpicture}}
-\caption{Rust types distribution for the compiler, crates.io, and lib.rs.
-(percentage) - appears here with the permission of the author - see the thesis at \url{https://urn.kb.se/resolve?urn=urn\%3Anbn\%3Ase\%3Akth\%3Adiva-332124}}
-\label{fig:stackedrust}
+The combined set shows a larger gain than either half on its own. This means that a large part of the improvement comes from placing clips from the two corpora on a more consistent common scale, so that a PSTN clip and a NISQA clip with the same true quality get similar predictions. MultiGauss, which never saw PSTN data, ranks the clips within each corpus almost as well, but places the two corpora less consistently relative to each other.
+
+\begin{table}[!ht]
+  \centering
+  \caption{Experiment A: MOS prediction on the combined NISQA and PSTN validation set, and on each half. $\Delta$ is the two-stage model minus MultiGauss.}
+  \label{tab:expAMix}
+  \begin{tabular}{lccc}
+    \toprule
+     & Combined (4\,000) & NISQA half (2\,000) & PSTN half (2\,000) \\
+    \midrule
+    \multicolumn{4}{l}{\emph{PCC}} \\
+    Two-stage model & \textbf{0.882} & 0.919 & \textbf{0.818} \\
+    MultiGauss      & 0.846 & \textbf{0.923} & 0.801 \\
+    $\Delta$        & $+0.036^{*}$ & $-0.004^{*}$ & $+0.017^{*}$ \\
+    \midrule
+    \multicolumn{4}{l}{\emph{RMSE}} \\
+    Two-stage model & 0.718 & 0.730 & 0.707 \\
+    MultiGauss      & \textbf{0.592} & \textbf{0.495} & \textbf{0.674} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Table~\ref{tab:expANisqaVal} shows all five quantities on the NISQA validation sets. The two models are tied: every difference is 0.005 or smaller and none is significant. Adding PSTN therefore did not improve the four dimensions, but did not harm them either.
+
+\begin{table}[!ht]
+  \centering
+  \caption{Experiment A: PCC on the pooled NISQA validation sets (2\,700 clips). None of the differences is significant.}
+  \label{tab:expANisqaVal}
+  \begin{tabular}{lcccccc}
+    \toprule
+     & MOS & NOI & COL & DIS & LOUD & Avg. \\
+    \midrule
+    Two-stage model & 0.918 & 0.870 & 0.855 & 0.863 & 0.818 & 0.865 \\
+    MultiGauss      & 0.923 & 0.872 & 0.858 & 0.867 & 0.823 & 0.868 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\paragraph{Corpora not seen in training.} The models were also evaluated on two MOS-only corpora that neither of them was trained on: BVCC, with synthetic speech, and TCD-VoIP, with VoIP degradations. On a combined set of 383 clips each from NISQA, PSTN, BVCC and TCD-VoIP, the two-stage model reached a MOS PCC of 0.856 against 0.813 for MultiGauss, a significant improvement. On each unseen corpus on its own, however, it did not do better: on BVCC its PCC was 0.835 against 0.843 (not significant), and on TCD-VoIP 0.871 against 0.887 (significant). The gain on the combined set therefore again comes mainly from a more consistent scale across corpora, not from ranking the clips within a new corpus better.
+
+\section{Experiment B: a MOS-only subset of the same corpus}
+\label{sec:resultsExpB}
+
+In Experiment~B, the two-stage model was trained on NISQA\_TRAIN\_SIM with all five labels and NISQA\_TRAIN\_LIVE with MOS only, and compared with MultiGauss trained on NISQA\_TRAIN\_SIM only. Table~\ref{tab:expB} shows the results.
+
+\begin{table}[!ht]
+  \centering
+  \caption{Experiment B: PCC of the two-stage model (SIM with all labels and LIVE with MOS only) and MultiGauss (SIM only). $\Delta$ is the two-stage model minus MultiGauss.}
+  \label{tab:expB}
+  \begin{tabular}{llcccccc}
+    \toprule
+    Evaluation set & & MOS & NOI & COL & DIS & LOUD & Avg. \\
+    \midrule
+    NISQA\_VAL\_LIVE & Two-stage & 0.868 & 0.641 & 0.549 & 0.571 & 0.688 & 0.663 \\
+    (200 clips)      & MultiGauss & 0.794 & 0.669 & 0.536 & 0.604 & 0.585 & 0.638 \\
+                     & $\Delta$ & $+0.073^{*}$ & $-0.028$ & $+0.013$ & $-0.034$ & $+0.102^{*}$ & $+0.026$ \\
+    \midrule
+    NISQA\_VAL\_SIM  & Two-stage & 0.918 & 0.869 & 0.850 & 0.862 & 0.789 & 0.858 \\
+    (2\,500 clips)   & MultiGauss & 0.920 & 0.878 & 0.853 & 0.875 & 0.790 & 0.863 \\
+                     & $\Delta$ & $-0.002$ & $-0.009^{*}$ & $-0.004$ & $-0.013^{*}$ & $-0.002$ & $-0.006^{*}$ \\
+    \midrule
+    Test sets, pooled & Two-stage & 0.906 & 0.843 & 0.876 & 0.872 & 0.606 & 0.821 \\
+    (712 clips)       & MultiGauss & 0.913 & 0.840 & 0.877 & 0.883 & 0.640 & 0.831 \\
+                      & $\Delta$ & $-0.006$ & $+0.003$ & $-0.001$ & $-0.012$ & $-0.034^{*}$ & $-0.010^{*}$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+On the live validation clips, which come from the same domain as the MOS-only training data, the two-stage model predicted MOS clearly better than MultiGauss ($+0.073^{*}$). Loudness also improved there ($+0.102^{*}$). The other three dimensions did not improve, and none of the differences in them is significant. On the simulated validation clips the two-stage model was slightly worse, mainly in noisiness and discontinuity. On the held-out test sets, MOS was not significantly different, but the average over the five quantities was significantly lower ($-0.010^{*}$), mostly because of loudness ($-0.034^{*}$). Looking at the three test sets separately, the average was lower on all three (by 0.012 on FOR, 0.015 on P501 and 0.012 on LIVETALK), significantly so only on P501.
+
+In short, the MOS-only LIVE data improved MOS prediction on live speech, the domain the data came from, but it did not improve the four dimensions in general.
+
+\section{Comparison with the masked-loss baseline}
+\label{sec:resultsMasked}
+
+Figure~\ref{fig:expBDeltas} and Table~\ref{tab:masked} compare the two-stage model with MultiGauss trained on the same SIM and LIVE data, using the masked loss of Section~\ref{sec:nanBaseline}. Both are shown relative to MultiGauss trained on SIM only.
+
+\begin{figure}[!ht]
+  \centering
+  \includegraphics[width=\textwidth]{figures/thesis/exp_b_deltas.pdf}
+  \caption{Experiment B: PCC of the two-stage model and of MultiGauss with the masked loss, both trained on SIM with all labels and LIVE with MOS only, relative to MultiGauss trained on SIM only. $^{*}$: significant difference from MultiGauss (SIM only).}
+  \label{fig:expBDeltas}
 \end{figure}
-\FloatBarrier
 
+\begin{table}[!ht]
+  \centering
+  \caption{Experiment B: the two-stage model compared with MultiGauss with the masked loss, trained on the same data. $\Delta$ is the two-stage model minus the masked-loss model.}
+  \label{tab:masked}
+  \begin{tabular}{llcccccc}
+    \toprule
+    Evaluation set & & MOS & NOI & COL & DIS & LOUD & Avg. \\
+    \midrule
+    NISQA\_VAL\_LIVE & Two-stage & 0.868 & 0.641 & 0.549 & 0.571 & 0.688 & 0.663 \\
+                     & Masked loss & 0.848 & 0.672 & 0.572 & 0.579 & 0.674 & 0.669 \\
+                     & $\Delta$ & $+0.020$ & $-0.031$ & $-0.023$ & $-0.008$ & $+0.014$ & $-0.006$ \\
+    \midrule
+    NISQA validation, & Two-stage & 0.919 & 0.858 & 0.851 & 0.853 & 0.810 & 0.858 \\
+    pooled            & Masked loss & 0.921 & 0.872 & 0.858 & 0.867 & 0.813 & 0.866 \\
+                      & $\Delta$ & $-0.002$ & $-0.014^{*}$ & $-0.007^{*}$ & $-0.014^{*}$ & $-0.003$ & $-0.008^{*}$ \\
+    \midrule
+    Test sets, pooled & Two-stage & 0.906 & 0.843 & 0.876 & 0.872 & 0.606 & 0.821 \\
+                      & Masked loss & 0.914 & 0.844 & 0.882 & 0.895 & 0.640 & 0.835 \\
+                      & $\Delta$ & $-0.008$ & $-0.001$ & $-0.006$ & $-0.023^{*}$ & $-0.034$ & $-0.014^{*}$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
 
+The masked-loss model gained almost as much on live MOS as the two-stage model ($+0.054^{*}$ against $+0.073^{*}$ over MultiGauss on SIM only), and the remaining difference of 0.020 between them is not significant. It also gained on live loudness, as the two-stage model did. Unlike the two-stage model, however, it lost nothing on the other sets: on the test sets its average over the five quantities was 0.835, the same as MultiGauss on SIM only (0.831, not significant), and significantly higher than the two-stage model (0.821).
+
+The benefit of the MOS-only data in Experiment~B is therefore available to a standard joint model with a masked loss, without the two-stage structure. The two-stage structure itself does not add to it, and costs some accuracy in the four dimensions.
+
+\section{Hyperparameter tuning}
+\label{sec:resultsTuning}
+
+The two-stage model was tuned in the setting of Experiment~A, with every setting chosen on the NISQA validation sets. The learning rate and its schedule had little effect: the average PCC of the four dimensions on the validation sets ranged only from 0.847 to 0.854. Weight decay and stronger dropout did not improve the test results either. Two changes did help. The first was to select the checkpoint on the average PCC of the four dimensions on the validation sets, instead of on MOS alone. The second was to weight the dimension loss four times higher than the MOS losses, which gives the first stage a stronger training signal. Table~\ref{tab:tuning} compares the tuned model with the original recipe and with MultiGauss.
+
+\begin{table}[!ht]
+  \centering
+  \caption{Hyperparameter tuning in the Experiment A setting: PCC on the pooled NISQA test sets and MOS PCC on PSTN\_VAL2K. The tuned model uses a learning rate of $3\times10^{-4}$ with a cosine schedule, a four times higher weight on the dimension loss, and checkpoint selection on the four dimensions.}
+  \label{tab:tuning}
+  \begin{tabular}{lccccccc}
+    \toprule
+     & MOS & NOI & COL & DIS & LOUD & Avg. & PSTN MOS \\
+    \midrule
+    Original recipe & 0.913 & 0.833 & 0.879 & 0.889 & 0.593 & 0.821 & \textbf{0.819} \\
+    Tuned           & \textbf{0.917} & 0.842 & \textbf{0.894} & \textbf{0.901} & \textbf{0.646} & \textbf{0.840} & \textbf{0.819} \\
+    MultiGauss      & 0.912 & \textbf{0.844} & 0.879 & 0.894 & 0.638 & 0.833 & 0.801 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Compared with the original recipe, the tuned model improved the average over the five quantities by 0.019$^{*}$, mostly through loudness ($+0.053^{*}$), without any loss in MOS. Compared with MultiGauss, it was now on par on the NISQA test sets: the average was 0.007 higher, which is not significant, and coloration was significantly better ($+0.015^{*}$). It kept the advantage on PSTN ($+0.018^{*}$). Tuning therefore closes the gap in the four dimensions that the original recipe has, but it does not produce a model that is clearly better than MultiGauss on NISQA. The tuned model was evaluated only in the Experiment~A setting.
+
+\section{Absolute accuracy of the predictions}
+\label{sec:resultsCalibration}
+
+The tables above also show a consistent difference in RMSE. In every experiment, the MOS predictions of the two-stage model have a clearly higher RMSE than those of MultiGauss, even where the PCC is the same or higher: for example 0.82 against 0.47 on the test sets in Experiment~B, and 0.73 against 0.50 on the NISQA half of Experiment~A. Since PCC is unaffected by a constant shift and RMSE is not, this points to a systematic offset. Indeed, the two-stage model in Experiment~B overestimates MOS on the test sets by 0.70 on average, against about 0.19 for MultiGauss. When this mean offset is removed, the MOS RMSE of every model falls to between 0.42 and 0.44. In Experiment~A, the two-stage model likewise overestimates MOS on all four corpora of the combined set (by 0.49 on NISQA, 0.51 on PSTN, 0.96 on BVCC and 0.76 on TCD-VoIP). The two-stage model therefore ranks clips as well as MultiGauss, but its absolute values are shifted upwards. The four dimensions are much less affected: on the pooled test sets of Experiment~B, their RMSE is at most 0.05 higher than for MultiGauss.
 
 \section{Reliability Analysis}
-\sweExpl{Analys av tillförlitlighet\\
-Tillförlitlighet i metod och data}
+\label{sec:reliabilityAnalysis}
+
+The variation between training runs was small for the main experiments: the standard deviation of the pooled test MOS PCC over three runs was typically 0.002--0.005, and up to about 0.01--0.02 for the dimensions. Differences of about 0.01 are therefore close to what training randomness alone can produce, which is why every comparison was tested for significance rather than judged from the means. The early project also showed how misleading a single run can be: in a three-run repetition of a study that was first run once, the dimension PCCs of the single run turned out to be 0.01--0.016 too high. The design studies that were run only once (the XLS-R layer and the first batch ratio study) should therefore be read as indicative. In the low-data studies, the variation between runs is larger (up to 0.04), because each run draws a different small subset of clips, and the individual differences there are uncertain.
 
 \section{Validity Analysis}
-\sweExpl{Analys av validitet\\
-Validitet i metod och data}
+\label{sec:validityAnalysis}
+
+Several factors limit how far the results can be generalised. First, every model's checkpoint was selected on NISQA validation MOS, so all results on the NISQA validation sets are slightly optimistic. This affects the baselines and the two-stage model alike, and the test sets, which were never used for any choice, give the cleaner comparison. Second, in Experiment~A the baseline is the single published MultiGauss checkpoint, which was trained with an 8-second crop, while the two-stage model uses 10 seconds. The comparison therefore includes this small difference in input, and the significance test covers only the variation over clips for MultiGauss. Experiment~B avoids both issues, since all its models were trained in this thesis with the same pipeline and three runs each. Third, pooling several test sets mixes ranking within each set with consistency between sets. Results are therefore also reported per set where it matters. Finally, all conclusions are based on one multidimensional corpus (NISQA) and one main MOS-only training corpus (PSTN, or the live part of NISQA), and may differ for other corpora.
 
 \cleardoublepage
 \chapter{Discussion}
