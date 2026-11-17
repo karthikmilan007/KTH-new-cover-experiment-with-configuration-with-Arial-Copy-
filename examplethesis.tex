@@ -359,6 +359,7 @@ nopostdot,noredefwarn]{glossaries}
 \numberwithin{listing}{chapter}
 
 \usepackage{subfiles}
+\usepackage{adjustbox} % shrink wide tables to the text width
 
 % To have Creative Commons (CC) license and logos use the doclicense package
 % Note that the lowercase version of the license has to be used in the modifier
@@ -833,6 +834,8 @@ The two-stage model rests on the assumption that MOS depends on the four quality
   \centering
   \caption{Relation between MOS and the four quality dimensions in the NISQA training labels: Pearson correlation between MOS and each dimension, and the coefficient of determination $R^2$ of a linear regression of MOS on all four dimensions.}
   \label{tab:mosDimCorrelation}
+  \setlength{\tabcolsep}{4pt}
+  \begin{adjustbox}{max width=\textwidth}
   \begin{tabular}{lrrrrrr}
     \toprule
     Training set & Clips & NOI & COL & DIS & LOUD & $R^2$ \\
@@ -841,6 +844,7 @@ The two-stage model rests on the assumption that MOS depends on the four quality
     NISQA\_TRAIN\_LIVE & 1\,020  & 0.50 & 0.60 & 0.58 & 0.76 & 0.76 \\
     \bottomrule
   \end{tabular}
+  \end{adjustbox}
 \end{table}
 
 Each dimension correlates positively with MOS, so when the rating of a dimension goes up or down, MOS tends to follow. Together, the four dimensions explain 87\,\% of the MOS variance in the simulated training set and 76\,\% in the live set, using only a linear combination. The relation is weaker for the live calls, where degradations are more varied and the labels are noisier. The part of MOS that the four dimensions do not explain is one reason why the MOS stage of the two-stage model also receives the speech features (Chapter~\ref{ch:whatYouDid}).
@@ -968,6 +972,7 @@ The NISQA corpus~\cite{mittag_nisqa_2021} is the source of all multidimensional 
   \centering
   \caption{Parts of the NISQA corpus used in this thesis. All parts have labels for MOS and the four quality dimensions.}
   \label{tab:nisqaSplits}
+  \begin{adjustbox}{max width=\textwidth}
   \begin{tabular}{llrl}
     \toprule
     Part & Distortions & Clips & Use \\
@@ -981,6 +986,7 @@ The NISQA corpus~\cite{mittag_nisqa_2021} is the source of all multidimensional 
     NISQA\_TEST\_LIVETALK & live recordings & 232 & evaluation only \\
     \bottomrule
   \end{tabular}
+  \end{adjustbox}
 \end{table}
 
 The \emph{simulated} parts (SIM) were created by passing clean speech through simulated transmission and processing, such as codecs, packet loss, noise, filtering and level changes, so they cover a wide range of quality. The \emph{live} parts (LIVE) are real calls made over Skype and from landlines to mobile phones. The 1\,020 LIVE training clips come from 495 different source recordings.
@@ -998,6 +1004,7 @@ The SIM and LIVE parts have quite different label distributions, which is import
   \centering
   \caption{Mean and standard deviation of the labels in the two NISQA training sets.}
   \label{tab:simLiveStats}
+  \begin{adjustbox}{max width=\textwidth}
   \begin{tabular}{lcc}
     \toprule
     Quantity & NISQA\_TRAIN\_SIM & NISQA\_TRAIN\_LIVE \\
@@ -1009,6 +1016,7 @@ The SIM and LIVE parts have quite different label distributions, which is import
     LOUD & 3.42 (0.84) & 2.26 (0.67) \\
     \bottomrule
   \end{tabular}
+  \end{adjustbox}
 \end{table}
 
 \subsection{PSTN corpus}
@@ -1223,6 +1231,8 @@ Each training step uses a batch of $B_\ell = 32$ fully labelled clips and $B_m =
   \centering
   \caption{How the two kinds of training clips are used.}
   \label{tab:trainingPaths}
+  \setlength{\tabcolsep}{4pt}
+  \begin{adjustbox}{max width=\textwidth}
   \begin{tabular}{p{3.2cm}p{4.6cm}p{4.6cm}}
     \toprule
      & Fully labelled clip & MOS-only clip \\
@@ -1232,6 +1242,7 @@ Each training step uses a batch of $B_\ell = 32$ fully labelled clips and $B_m =
     Stage 2 loss & Gaussian NLL on the MOS label & Gaussian NLL on the MOS label \\
     \bottomrule
   \end{tabular}
+  \end{adjustbox}
 \end{table}
 
 \subsection{Loss function}
@@ -1280,6 +1291,8 @@ Table~\ref{tab:twoStageVsMultiGauss} summarises how the two-stage model relates 
   \centering
   \caption{The two-stage model compared with MultiGauss.}
   \label{tab:twoStageVsMultiGauss}
+  \setlength{\tabcolsep}{4pt}
+  \begin{adjustbox}{max width=\textwidth}
   \begin{tabular}{p{3.6cm}p{4.4cm}p{4.4cm}}
     \toprule
      & MultiGauss & Two-stage model \\
@@ -1292,6 +1305,7 @@ Table~\ref{tab:twoStageVsMultiGauss} summarises how the two-stage model relates 
     Covariance between MOS and the dimensions & modelled & not modelled \\
     \bottomrule
   \end{tabular}
+  \end{adjustbox}
 \end{table}
 
 The main advantage of the two-stage model is that it can learn from MOS-only clips. It also has a disadvantage. MultiGauss models the covariance between MOS and each dimension, so its output describes how their errors are related. The two-stage model predicts MOS from the dimensions instead, and its output distributions do not include this covariance. In addition, errors in the predicted dimensions are passed on to the MOS prediction, which the joint model avoids.
@@ -1330,6 +1344,8 @@ Table~\ref{tab:scheduledSampling} compares teacher forcing with scheduled sampli
   \centering
   \caption{Teacher forcing compared with scheduled sampling. PCC on the pooled NISQA test sets, mean of three runs.}
   \label{tab:scheduledSampling}
+  \setlength{\tabcolsep}{4pt}
+  \begin{adjustbox}{max width=\textwidth}
   \begin{tabular}{lcccccc}
     \toprule
     Training of Stage 2 & MOS & NOI & COL & DIS & LOUD & Avg. \\
@@ -1338,6 +1354,7 @@ Table~\ref{tab:scheduledSampling} compares teacher forcing with scheduled sampli
     Scheduled sampling  & 0.917 & 0.835 & 0.885 & 0.891 & 0.617 & 0.829 \\
     \bottomrule
   \end{tabular}
+  \end{adjustbox}
 \end{table}
 
 \subsection{Batch ratio}
@@ -1380,6 +1397,8 @@ Table~\ref{tab:sslLayer} compares features from three XLS-R layers, each at thre
   \centering
   \caption{MOS PCC for features from three XLS-R layers, at three shares of NISQA clips in the batch, on the pooled NISQA test sets and on PSTN\_VAL2K. Single training runs.}
   \label{tab:sslLayer}
+  \setlength{\tabcolsep}{4pt}
+  \begin{adjustbox}{max width=\textwidth}
   \begin{tabular}{lcccccc}
     \toprule
      & \multicolumn{3}{c}{NISQA test sets} & \multicolumn{3}{c}{PSTN\_VAL2K} \\
@@ -1391,6 +1410,7 @@ Table~\ref{tab:sslLayer} compares features from three XLS-R layers, each at thre
     Layer 32 & 0.872 & 0.871 & 0.858 & 0.788 & 0.793 & \textbf{0.810} \\
     \bottomrule
   \end{tabular}
+  \end{adjustbox}
 \end{table}
 
 \subsection{Summary of the design studies}
@@ -1408,6 +1428,7 @@ The combined set shows a larger gain than either half on its own. This means tha
   \centering
   \caption{Experiment A: MOS prediction on the combined NISQA and PSTN validation set, and on each half. $\Delta$ is the two-stage model minus MultiGauss.}
   \label{tab:expAMix}
+  \begin{adjustbox}{max width=\textwidth}
   \begin{tabular}{lccc}
     \toprule
      & Combined (4\,000) & NISQA half (2\,000) & PSTN half (2\,000) \\
@@ -1422,6 +1443,7 @@ The combined set shows a larger gain than either half on its own. This means tha
     MultiGauss      & \textbf{0.592} & \textbf{0.495} & \textbf{0.674} \\
     \bottomrule
   \end{tabular}
+  \end{adjustbox}
 \end{table}
 
 Table~\ref{tab:expANisqaVal} shows all five quantities on the NISQA validation sets. The two models are tied: every difference is 0.005 or smaller and none is significant. Adding PSTN therefore did not improve the four dimensions, but did not harm them either.
@@ -1430,6 +1452,8 @@ Table~\ref{tab:expANisqaVal} shows all five quantities on the NISQA validation s
   \centering
   \caption{Experiment A: PCC on the pooled NISQA validation sets (2\,700 clips). None of the differences is significant.}
   \label{tab:expANisqaVal}
+  \setlength{\tabcolsep}{4pt}
+  \begin{adjustbox}{max width=\textwidth}
   \begin{tabular}{lcccccc}
     \toprule
      & MOS & NOI & COL & DIS & LOUD & Avg. \\
@@ -1438,6 +1462,7 @@ Table~\ref{tab:expANisqaVal} shows all five quantities on the NISQA validation s
     MultiGauss      & 0.923 & 0.872 & 0.858 & 0.867 & 0.823 & 0.868 \\
     \bottomrule
   \end{tabular}
+  \end{adjustbox}
 \end{table}
 
 \paragraph{Corpora not seen in training.} The models were also evaluated on two MOS-only corpora that neither of them was trained on: BVCC~\cite{cooper_ssw_2021}, with synthetic speech, and TCD-VoIP~\cite{harte_tcdvoip_2015}, with \gls{VoIP} degradations. On a combined set of 383 clips each from NISQA, PSTN, BVCC and TCD-VoIP, the two-stage model reached a MOS PCC of 0.856 against 0.813 for MultiGauss, a significant improvement. On each unseen corpus on its own, however, it did not do better: on BVCC its PCC was 0.835 against 0.843 (not significant), and on TCD-VoIP 0.871 against 0.887 (significant). The gain on the combined set therefore again comes mainly from a more consistent scale across corpora, not from ranking the clips within a new corpus better.
@@ -1451,6 +1476,8 @@ In Experiment~B, the two-stage model was trained on NISQA\_TRAIN\_SIM with all f
   \centering
   \caption{Experiment B: PCC of the two-stage model (SIM with all labels and LIVE with MOS only) and MultiGauss (SIM only). $\Delta$ is the two-stage model minus MultiGauss.}
   \label{tab:expB}
+  \setlength{\tabcolsep}{4pt}
+  \begin{adjustbox}{max width=\textwidth}
   \begin{tabular}{llcccccc}
     \toprule
     Evaluation set & & MOS & NOI & COL & DIS & LOUD & Avg. \\
@@ -1468,6 +1495,7 @@ In Experiment~B, the two-stage model was trained on NISQA\_TRAIN\_SIM with all f
                       & $\Delta$ & $-0.006$ & $+0.003$ & $-0.001$ & $-0.012$ & $-0.034^{*}$ & $-0.010^{*}$ \\
     \bottomrule
   \end{tabular}
+  \end{adjustbox}
 \end{table}
 
 On the live validation clips, which come from the same domain as the MOS-only training data, the two-stage model predicted MOS clearly better than MultiGauss ($+0.073^{*}$). Loudness also improved there ($+0.102^{*}$). The other three dimensions did not improve, and none of the differences in them is significant. On the simulated validation clips the two-stage model was slightly worse, mainly in noisiness and discontinuity. On the held-out test sets, MOS was not significantly different, but the average over the five quantities was significantly lower ($-0.010^{*}$), mostly because of loudness ($-0.034^{*}$). Looking at the three test sets separately, the average was lower on all three (by 0.012 on FOR, 0.015 on P501 and 0.012 on LIVETALK), significantly so only on P501.
@@ -1490,6 +1518,8 @@ Figure~\ref{fig:expBDeltas} and Table~\ref{tab:masked} compare the two-stage mod
   \centering
   \caption{Experiment B: the two-stage model compared with MultiGauss with the masked loss, trained on the same data. $\Delta$ is the two-stage model minus the masked-loss model.}
   \label{tab:masked}
+  \setlength{\tabcolsep}{4pt}
+  \begin{adjustbox}{max width=\textwidth}
   \begin{tabular}{llcccccc}
     \toprule
     Evaluation set & & MOS & NOI & COL & DIS & LOUD & Avg. \\
@@ -1507,6 +1537,7 @@ Figure~\ref{fig:expBDeltas} and Table~\ref{tab:masked} compare the two-stage mod
                       & $\Delta$ & $-0.008$ & $-0.001$ & $-0.006$ & $-0.023^{*}$ & $-0.034$ & $-0.014^{*}$ \\
     \bottomrule
   \end{tabular}
+  \end{adjustbox}
 \end{table}
 
 The masked-loss model gained almost as much on live MOS as the two-stage model ($+0.054^{*}$ against $+0.073^{*}$ over MultiGauss on SIM only), and the remaining difference of 0.020 between them is not significant. It also gained on live loudness, as the two-stage model did. Unlike the two-stage model, however, it lost nothing on the other sets: on the test sets its average over the five quantities was 0.835, the same as MultiGauss on SIM only (0.831, not significant), and significantly higher than the two-stage model (0.821).
@@ -1522,6 +1553,8 @@ The two-stage model was tuned in the setting of Experiment~A, with every setting
   \centering
   \caption{Hyperparameter tuning in the Experiment A setting: PCC on the pooled NISQA test sets and MOS PCC on PSTN\_VAL2K. The tuned model uses a learning rate of $3\times10^{-4}$ with a cosine schedule, a four times higher weight on the dimension loss, and checkpoint selection on the four dimensions.}
   \label{tab:tuning}
+  \setlength{\tabcolsep}{4pt}
+  \begin{adjustbox}{max width=\textwidth}
   \begin{tabular}{lccccccc}
     \toprule
      & MOS & NOI & COL & DIS & LOUD & Avg. & PSTN MOS \\
@@ -1531,6 +1564,7 @@ The two-stage model was tuned in the setting of Experiment~A, with every setting
     MultiGauss      & 0.912 & \textbf{0.844} & 0.879 & 0.894 & 0.638 & 0.833 & 0.801 \\
     \bottomrule
   \end{tabular}
+  \end{adjustbox}
 \end{table}
 
 Compared with the original recipe, the tuned model improved the average over the five quantities by 0.019$^{*}$, mostly through loudness ($+0.053^{*}$), without any loss in MOS. Compared with MultiGauss, it was now on par on the NISQA test sets: the average was 0.007 higher, which is not significant, and coloration was significantly better ($+0.015^{*}$). It kept the advantage on PSTN ($+0.018^{*}$). Tuning therefore closes the gap in the four dimensions that the original recipe has, but it does not produce a model that is clearly better than MultiGauss on NISQA. The tuned model was evaluated only in the Experiment~A setting.
