@@ -729,7 +729,9 @@ Speech is still the main way people communicate over telephone networks, \gls{Vo
 \section{Background}
 \label{sec:background}
 
-The reference measure of speech quality is the \gls{MOS}. A group of listeners rates each speech clip on a five-point \gls{ACR} scale, from 1 (bad) to 5 (excellent), and the MOS is the average of their ratings~\cite{itu_p800}. Listening tests give reliable results, but they are slow and expensive, and they cannot be run continuously on a live network. This has motivated \emph{objective} speech quality models that predict MOS directly from the signal. \emph{Non-intrusive} models are particularly useful because they need only the degraded signal, not a clean reference~\cite{mittag_nisqa_2021}.
+\Gls{SQA} is the task of determining how good a speech signal sounds to the people who listen to it. It is needed wherever speech is transmitted or processed. Network operators monitor the quality of telephone and \gls{VoIP} calls, codec and network designers compare systems before they are deployed, and researchers evaluate speech enhancement and \gls{TTS} systems. SQA can be \emph{subjective}, where listeners rate speech in a listening test, or \emph{objective}, where a computational model predicts what those listeners would have said~\cite{moller_trends_2011}.
+
+In subjective SQA, the reference measure of speech quality is the \gls{MOS}. A group of listeners rates each speech clip on a five-point \gls{ACR} scale, from 1 (bad) to 5 (excellent), and the MOS is the average of their ratings~\cite{itu_p800}. Listening tests give reliable results, but they are slow and expensive, and they cannot be run continuously on a live network. This has motivated \emph{objective} speech quality models that predict MOS directly from the signal. \emph{Non-intrusive} models are particularly useful because they need only the degraded signal, not a clean reference~\cite{mittag_nisqa_2021}.
 
 A single MOS says how good a clip sounds overall, but not \emph{why} it sounds that way. \gls{ITU-T} Recommendation P.804~\cite{itu_p804} therefore defines four perceptual quality dimensions in addition to the overall quality: \emph{noisiness} (NOI), \emph{coloration} (COL), \emph{discontinuity} (DIS) and \emph{loudness} (LOUD). Predicting these dimensions makes a model diagnostic. A low MOS caused by background noise needs a different fix from a low MOS caused by packet loss. The NISQA corpus~\cite{mittag_nisqa_2021} made multidimensional prediction practical, as it provides crowdsourced ratings of all five quantities for each clip.
 
@@ -798,18 +800,66 @@ Chapter~\ref{ch:background} presents the background on subjective and objective 
 % Bold vectors/matrices: \bm renders blank with unicode-math (XeLaTeX/LuaLaTeX), so use \symbf there.
 \providecommand{\vect}[1]{\ifdefined\symbf\symbf{#1}\else\bm{#1}\fi}
 
-This chapter gives the background needed to follow the rest of the thesis. Section~\ref{sec:subjectiveQuality} explains how speech quality is measured in listening tests, and Section~\ref{sec:mosAndDimensions} examines how the overall quality relates to the four quality dimensions, which is the basis of the two-stage model. Section~\ref{sec:objectiveModels} reviews objective speech quality models, and Section~\ref{sec:ssl} introduces the self-supervised speech representations used as input features. Section~\ref{sec:probabilistic} describes probabilistic regression, and Section~\ref{sec:partialLabels} covers training on data where some labels are missing. Section~\ref{sec:relatedWork} summarises related work, and Section~\ref{sec:backgroundSummary} summarises the chapter.
+This chapter gives the background needed to follow the rest of the thesis. Section~\ref{sec:sqa} introduces speech quality assessment: what speech quality is, what degrades it, how it can be assessed, and what makes data-driven assessment difficult. Section~\ref{sec:subjectiveQuality} explains how speech quality is measured in listening tests, and Section~\ref{sec:mosAndDimensions} examines how the overall quality relates to the four quality dimensions, which is the basis of the two-stage model. Section~\ref{sec:objectiveModels} reviews objective speech quality models, and Section~\ref{sec:ssl} introduces the self-supervised speech representations used as input features. Section~\ref{sec:probabilistic} describes probabilistic regression, and Section~\ref{sec:partialLabels} covers training on data where some labels are missing. Section~\ref{sec:relatedWork} summarises related work, and Section~\ref{sec:backgroundSummary} summarises the chapter.
+
+\section{Speech quality assessment}
+\label{sec:sqa}
+
+\subsection{What speech quality is}
+\label{sec:whatIsQuality}
+
+Jekosch defines speech quality as the result of a listener's judgement of the perceived composition of a speech signal in comparison with the composition the listener desires or expects~\cite{jekosch_2005}. Two consequences of this definition shape the whole field. First, quality is formed in the listener, not in the signal. The same narrowband call can be acceptable on a mobile phone and unacceptable in a studio, because the listener's expectations differ. Second, there is no physical instrument that measures speech quality directly. The ground truth is always a judgement made by human listeners, and any automatic method can at best predict that judgement. In ITU-T terminology, speech quality is one part of the user's \emph{quality of experience}, the degree of delight or annoyance of the user of a service~\cite{itu_p10}.
+
+\subsection{What degrades speech quality}
+\label{sec:degradations}
+
+Between the talker and the listener, a speech signal passes through a chain of processing steps, and each of them can degrade it~\cite{moller_trends_2011}:
+\begin{itemize}
+\item \textbf{Acoustic environment.} Background noise and reverberation at the talker's side are picked up together with the speech.
+\item \textbf{Capture and pre-processing.} The microphone, noise suppression and automatic gain control can remove parts of the speech or leave artefacts.
+\item \textbf{Coding.} Speech codecs reduce the bit rate by discarding information. Low bit rates add coding noise, and many systems limit the audio bandwidth, for example to the narrowband range of about 300--3\,400\,Hz used in traditional telephony.
+\item \textbf{Transmission.} In packet networks, lost or late packets cause gaps that the receiver has to conceal, which leads to interruptions and artefacts.
+\item \textbf{Playback.} The level at which the speech is played and the listener's device also affect what is heard.
+\end{itemize}
+Different kinds of degradation tend to be heard in different ways. Noise is heard as noisiness, bandwidth limitation and poor frequency responses as coloration, packet loss as discontinuity, and a wrongly set level as a loudness problem. This is the idea behind the four quality dimensions described in Section~\ref{sec:qualityDimensions}. In a real call, several degradations occur together, so the overall quality reflects their combined effect.
+
+\subsection{Subjective and objective assessment}
+\label{sec:subjectiveObjective}
+
+Figure~\ref{fig:sqaTaxonomy} gives an overview of SQA methods. \emph{Subjective} methods ask listeners to rate speech, either in a laboratory under controlled conditions or through crowdsourcing over the internet. They define the ground truth, but they are slow and expensive, and they cannot be run continuously. \emph{Objective} methods predict the outcome of a listening test with a computational model. Intrusive models compare the degraded signal with a clean reference, while non-intrusive models use only the degraded signal. Non-intrusive models were first built from hand-crafted signal features and rules, and are now mostly data-driven: deep neural networks trained on corpora of speech clips with subjective ratings. Subjective tests are described in Section~\ref{sec:subjectiveQuality} and objective models in Section~\ref{sec:objectiveModels}.
+
+\begin{figure}[!ht]
+  \centering
+  \includegraphics[width=\textwidth]{figures/thesis/sqa_taxonomy.pdf}
+  \caption{Overview of speech quality assessment methods. Data-driven non-intrusive models, the kind studied in this thesis (highlighted), are trained on corpora rated in subjective tests.}
+  \label{fig:sqaTaxonomy}
+\end{figure}
+
+The two families depend on each other. An objective model is trained and validated on subjective ratings, so it can be no better than the ratings it learns from, and its usefulness is limited by how much rated data exists. This thesis is about data-driven non-intrusive SQA, and about how the subjective data available for training such models can be used more fully.
+
+\subsection{Challenges of data-driven assessment}
+\label{sec:sqaChallenges}
+
+Data-driven SQA models face four challenges that are relevant to this thesis:
+\begin{description}
+\item[Scarce labels.] Every label requires several listeners to rate a clip, so rated corpora are expensive to build. Corpora with ratings of the quality dimensions are especially rare, because each clip has to be rated on five scales instead of one (Section~\ref{sec:qualityDimensions}).
+\item[Different scales.] Corpora rated in separate listening tests do not use the rating scale in exactly the same way, which makes it difficult to train one model on several corpora (Section~\ref{sec:corpusEffects}).
+\item[Generalisation.] A model trained on one corpus often performs worse on speech from other systems, languages or listening tests. It is therefore important to evaluate on corpora that were not used for training.
+\item[Uncertainty.] Listeners disagree, and some clips are rated far more consistently than others. A single predicted score hides this, which motivates probabilistic models that also predict their uncertainty (Section~\ref{sec:probabilistic}).
+\end{description}
+This thesis addresses mainly the first challenge, by combining multidimensional data with MOS-only data. Because the combined corpora were rated in separate tests, the second challenge comes with it. The third is addressed by evaluating on unseen corpora, and the fourth by building on a probabilistic model.
 
 \section{Subjective speech quality}
 \label{sec:subjectiveQuality}
 
 \subsection{Mean opinion score}
 
-Speech quality is a perceptual property: it is defined by how listeners experience a speech signal, not by a physical measurement. The reference method for measuring it is a listening test. ITU-T Recommendation P.800~\cite{itu_p800} describes the most common procedure, the \gls{ACR} test. Listeners hear one speech clip at a time and rate its quality on a five-point scale: 5 (excellent), 4 (good), 3 (fair), 2 (poor) and 1 (bad). The \gls{MOS} of a clip is the average of the ratings it receives. 
+As Section~\ref{sec:whatIsQuality} explained, the reference method for measuring speech quality is a listening test. ITU-T Recommendation P.800~\cite{itu_p800} describes the most common procedure, the \gls{ACR} test. Listeners hear one speech clip at a time and rate its quality on a five-point scale: 5 (excellent), 4 (good), 3 (fair), 2 (poor) and 1 (bad). The \gls{MOS} of a clip is the average of the ratings it receives. 
 
 Laboratory listening tests are slow and expensive, because they require a controlled environment and a panel of listeners. ITU-T P.808~\cite{itu_p808} therefore specifies how to run ACR tests through crowdsourcing, where many listeners rate clips over the internet with their own equipment. Crowdsourcing makes large rated corpora possible, and the corpora used in this thesis were rated in this way~\cite{mittag_nisqa_2021,mittag_pstn_2020}.
 
 \subsection{Quality dimensions}
+\label{sec:qualityDimensions}
 
 MOS states how good a clip sounds, but not why. ITU-T P.804~\cite{itu_p804} defines a diagnostic test in which listeners also rate four perceptual \emph{quality dimensions}, each on a five-point scale where a higher value means better quality:
 \begin{description}
@@ -862,7 +912,7 @@ Table~\ref{tab:mosDimCorrelation} and Figure~\ref{fig:mosDimCorrelation} also sh
 \section{Objective speech quality models}
 \label{sec:objectiveModels}
 
-Objective speech quality models predict the result of a listening test from the speech signal. They are divided into \emph{intrusive} and \emph{non-intrusive} models.
+Objective speech quality models predict the result of a listening test from the speech signal. As shown in Figure~\ref{fig:sqaTaxonomy}, they are divided into \emph{intrusive} and \emph{non-intrusive} models.
 
 \subsection{Intrusive models}
 
@@ -934,7 +984,7 @@ Multidimensional models are fewer. NISQA~\cite{mittag_nisqa_2021} predicts the f
 \section{Summary}
 \label{sec:backgroundSummary}
 
-Speech quality is measured in listening tests as a MOS, and P.804 adds four quality dimensions that explain the overall quality. In the NISQA labels, a linear combination of the four dimensions explains most of the MOS variance, which supports the assumption behind the two-stage model. MOS values from different corpora are not on exactly the same scale, which is a challenge for any model trained on combined data. Modern non-intrusive models use features from large self-supervised speech models, and MultiGauss predicts all five quantities as one multivariate Gaussian. Since a joint model needs all five labels, MOS-only data can be used either by masking missing labels or by a multi-task or cascaded design. The two-stage model uses a cascaded design.
+Speech quality is a listener's judgement, so SQA rests on listening tests, and objective models learn to predict their results. Data-driven models are limited above all by how much rated data exists. Speech quality is measured in listening tests as a MOS, and P.804 adds four quality dimensions that explain the overall quality. In the NISQA labels, a linear combination of the four dimensions explains most of the MOS variance, which supports the assumption behind the two-stage model. MOS values from different corpora are not on exactly the same scale, which is a challenge for any model trained on combined data. Modern non-intrusive models use features from large self-supervised speech models, and MultiGauss predicts all five quantities as one multivariate Gaussian. Since a joint model needs all five labels, MOS-only data can be used either by masking missing labels or by a multi-task or cascaded design. The two-stage model uses a cascaded design.
 
 \cleardoublepage
 \chapter{Method}
