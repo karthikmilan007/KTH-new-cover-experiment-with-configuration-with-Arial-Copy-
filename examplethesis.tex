@@ -708,6 +708,7 @@ Combining the two kinds of data raises several questions. First, it is not obvio
 The purpose of this thesis is to find out whether combining scarce multidimensional data with abundant MOS-only data gives better speech quality models than the multidimensional data alone. If it does, less new and expensive multidimensional listening data has to be collected. Better non-intrusive models help network operators and developers of speech communication systems to monitor quality and to find the cause of a degradation without running listening tests. This also has a sustainability and resource benefit. Data that has already been collected and paid for is reused instead of new listening tests being commissioned, and the models are trained on fixed pre-computed features instead of fine-tuning a large network.
 
 \section{Goals}
+\label{sec:goals}
 
 The goal of this project is to design, train and evaluate a two-stage probabilistic speech quality model that can learn from both fully labelled and MOS-only data, and to compare it fairly with a strong existing model. This goal has been divided into the following sub-goals:
 \begin{enumerate}
@@ -1592,95 +1593,130 @@ Several factors limit how far the results can be generalised. First, every model
 \cleardoublepage
 \chapter{Discussion}
 \label{ch:discussion}
-\sweExpl{Diskussion\\
-Förbättringsförslag?}
-\generalExpl{This can be a separate chapter or a section in the previous chapter.}
+
+This chapter interprets the results of Chapter~\ref{ch:resultsAndAnalysis}. Section~\ref{sec:rqAnswers} answers the three research questions, Section~\ref{sec:whyResults} discusses why the results came out as they did, and Section~\ref{sec:previousWork} relates them to previous work.
+
+\section{Answers to the research questions}
+\label{sec:rqAnswers}
+
+\paragraph{RQ1: Does combined training improve MOS prediction?}
+Partly. Adding MOS-only data improved MOS prediction on the kind of speech that the MOS-only data came from. In Experiment~A, the MOS PCC on PSTN rose from 0.801 to 0.818, and in Experiment~B the MOS PCC on live calls rose from 0.794 to 0.868. Both gains are significant. In the low-data study, the two-stage model also predicted MOS better than MultiGauss at six of seven data sizes, with the largest gain when the multidimensional data was scarcest. On the multidimensional corpus itself, the combined training did not help: on NISQA the two models were tied, and on the NISQA half of the combined set MultiGauss was slightly better. Across corpora, the picture is mixed. On sets that combine several corpora, the two-stage model was clearly better (0.882 against 0.846 for NISQA and PSTN, and 0.856 against 0.813 for four corpora), but this gain comes mainly from placing the corpora on a more consistent common scale. On the two corpora that neither model was trained on, the two-stage model was not better: it was on par on BVCC and significantly worse on TCD-VoIP. The answer to RQ1 is therefore that MOS-only data improves MOS prediction within its own domain and across a mix of the training corpora, but it does not by itself make the model generalise better to new corpora.
+
+\paragraph{RQ2: Does combined training also improve the four dimensions?}
+No. The hypothesis stated in Section~\ref{sec:researchQuestion}, that better MOS prediction would also improve the dimensions because MOS depends on them, is not supported. In Experiment~A, the dimensions on the NISQA validation sets were unchanged, and on the test sets the average over the five quantities was lower than for MultiGauss (0.821 against 0.833), mainly because of loudness. In Experiment~B, the average over the five quantities on the test sets was significantly lower ($-0.010$), again mainly because of loudness. In the low-data study, the dimensions were predicted worse than by MultiGauss at every data size. The only gain in a dimension was for loudness on the live validation clips ($+0.102$), in the same domain as the MOS-only data. In short, the MOS-only data did not transfer to the dimensions, and it sometimes cost a little accuracy in them.
+
+\paragraph{RQ3: How does the two-stage model compare with a masked-loss model?}
+MultiGauss trained with a masked loss on the same data achieved almost the same MOS gain on live calls as the two-stage model ($+0.054$ against $+0.073$ over MultiGauss trained on SIM only, with no significant difference between the two). Unlike the two-stage model, it lost no accuracy in the dimensions, and its average over the five quantities on the test sets was significantly higher than that of the two-stage model (0.835 against 0.821). The masked-loss model is also simpler. The benefit of the MOS-only data therefore does not depend on the two-stage structure, and the structure itself adds nothing that the masked loss does not already provide.
+
+\paragraph{Overall.} Taken together, the answers show that the benefit comes from the additional \emph{data}, not from the two-stage \emph{architecture}. MOS-only data is useful, and a standard joint model with a masked loss is enough to use it. MOS-only data can complement multidimensional data, but the results do not show that it can replace it: the dimensions still need dimension labels.
+
+\section{Why the results look this way}
+\label{sec:whyResults}
+
+\subsection{Why the dimensions did not benefit}
+
+The two-stage model was designed so that the MOS error of a MOS-only clip flows back through the predicted dimensions into Stage~1. There are several reasons why this signal did not improve the dimensions.
+
+First, a single MOS value does not determine four dimension values. Many combinations of dimensions give the same MOS, so the MOS error tells Stage~1 only that its predictions should be changed in the direction that affects MOS, not which dimension is wrong. The gradient is a weak and indirect training signal compared with a dimension label.
+
+Second, Stage~2 does not have to go through the dimensions at all. It also receives the encoded features $\vect{h}$ directly, and the design study in Section~\ref{sec:designStudyResults} showed that this path makes no difference to MOS on NISQA. For MOS-only clips, the easiest way to reduce the MOS error may be to change the shared encoder or Stage~2 rather than the dimension predictions. The encoder is then partly trained to serve MOS, which can explain the small losses in the dimensions. This is a form of the negative transfer that is known from multi-task learning, where a shared network does not always benefit every task~\cite{caruana_multitask_1997}.
+
+Third, the most obvious alternative explanations were ruled out. The first stage sees only half as many fully labelled clips per step as MultiGauss, but with equal numbers of fully labelled clips per step the dimensions still did not improve (Section~\ref{sec:designStudyResults}). The ratio of the two kinds of clips in the batch and the use of scheduled sampling made no clear difference either. The result is therefore not a side effect of a particular training setting.
+
+Loudness on live calls is the one exception. In the NISQA live data, loudness is the dimension that correlates most strongly with MOS (0.76, Table~\ref{tab:mosDimCorrelation}), and live calls differ from the simulated data especially in loudness (Section~\ref{sec:datasets}). The MOS error of the live clips therefore carries more information about loudness than about the other dimensions, and loudness is also the dimension that is predicted worst, which leaves the most room for improvement. Outside the live domain, however, loudness was the dimension that lost the most.
+
+\subsection{Why MOS improved in the domain of the MOS-only data}
+
+The MOS gains were largest where the MOS-only data came from: PSTN calls in Experiment~A and live calls in Experiment~B. The simplest explanation is that the model saw more examples of these kinds of speech and their degradations during training. The masked-loss model, which sees the same data without the two-stage structure, gained almost as much, which supports this explanation. The gains on combined sets were larger than on any single corpus, because the model also learnt to place the corpora on a more consistent scale relative to each other. This kind of improvement matters in practice when one model is used for speech from different sources, but it does not mean that the model ranks clips within a single new corpus better, as the results on BVCC and TCD-VoIP show.
+
+\subsection{The offset in the MOS predictions}
+
+The MOS predictions of the two-stage model are shifted upwards by about 0.5--0.7 on average, which gives it a higher RMSE than MultiGauss although the PCC is the same or higher (Section~\ref{sec:resultsCalibration}). Since the offset disappears from the RMSE once the mean is removed, the model ranks clips correctly, but its absolute values are not calibrated. The cause was not investigated in detail, but two factors are likely to contribute. First, Stage~2 is trained on the true dimension values for fully labelled clips but receives predicted values at test time; predicted values are typically pulled towards the mean of the training data, so Stage~2 sees inputs at test time that differ systematically from those it was trained on. Second, the MOS-only corpora were rated in separate listening tests and use the MOS scale differently from NISQA (Section~\ref{sec:corpusEffects}), and the model has no way to tell which scale a label comes from. The offset does not affect the PCC on which the research questions are answered, but it matters for any use that relies on absolute MOS values. A linear calibration on a validation set, or a loss that models the scale of each corpus, would probably remove most of it.
+
+\subsection{Tuning and design choices}
+
+None of the design choices that were studied had a large effect: the batch ratio, scheduled sampling and the XLS-R layer all changed the results by about as much as the variation between training runs. This means that the conclusions above do not depend on a particular setting. The hyperparameter tuning in Section~\ref{sec:resultsTuning} gave the clearest improvement. Weighting the dimension loss four times higher and selecting the checkpoint on the dimensions raised the average over the five quantities to 0.840, compared with 0.833 for MultiGauss (not significant), while keeping the gain on PSTN. This suggests that part of the loss in the dimensions comes from the balance between the two tasks in the shared network, and that giving the dimensions more weight can recover it. It does not, however, turn the MOS-only data into a source of improvement for the dimensions.
+
+\section{Relation to previous work}
+\label{sec:previousWork}
+
+\paragraph{MultiGauss.} The two-stage model builds directly on MultiGauss~\cite{cumlin_multigauss_2025}, and the evaluation pipeline reproduces its published results. The two-stage model matches or improves on MultiGauss for MOS in the domains of the added data, but not for the dimensions. In the setting MultiGauss was designed for, where all labels are available, the joint model remains a strong choice, and its single joint distribution over the five quantities proved at least as good as the cascade for the dimensions.
+
+\paragraph{NISQA.} NISQA~\cite{mittag_nisqa_2021} predicts the five quantities with separate heads on a shared network, trained on fully labelled data only. Like the two-stage model, it relies on a shared encoder for all quantities. The results of this thesis suggest that adding MOS-only clips to such a shared network should not be expected to improve the dimension heads.
+
+\paragraph{Masked losses.} Wang et~al.~\cite{wang_urgentmos_2026} use a masked loss to train one model on corpora with different label sets. The results here agree with that approach: a masked loss turned out to be a strong and simple way to use MOS-only data, and it performed at least as well as the more complex two-stage structure.
+
+\paragraph{Training on several corpora.} Several earlier works train MOS models on more than one corpus and model the differences between them, for example with a bias-aware loss that learns a mapping to each corpus's scale~\cite{mittag_biasaware_2021}, or with listener- or corpus-dependent components~\cite{leng_mbnet_2021,huang_ldnet_2022}. The two-stage model does not model the corpus scales, and the offset in its MOS predictions and its mixed results on unseen corpora are consistent with the problems these works address. Combining such a component with the two-stage model is a natural next step (Section~\ref{sec:futureWork}).
+
+\paragraph{Multi-task and cascaded learning.} The two-stage model is a cascade in which one task's output is the input of the next, trained with teacher forcing~\cite{williams_zipser_1989}. Scheduled sampling~\cite{bengio_scheduled_2015} is known to reduce the mismatch between training and test inputs in such models, but here it made no clear difference. The lack of transfer from the MOS task to the dimension task is in line with the experience from multi-task learning that an auxiliary task helps only when its training signal is informative for the main task~\cite{caruana_multitask_1997}. For the dimensions, a MOS label is not informative enough.
+
+\paragraph{Contribution.} To the author's knowledge, this is the first study that tests whether MOS-only data improves the prediction of the P.804 dimensions. The answer, for the corpora and models studied, is that it improves MOS but not the dimensions, and that a masked loss is enough to obtain this benefit.
 
 \cleardoublepage
 \chapter{Conclusions and Future work}
 \label{ch:conclusionsAndFutureWork}
-\sweExpl{Slutsats och framtida arbete}
 
-\generalExpl{Add text to introduce the subsections of this chapter.}
+This chapter states the conclusions of the thesis (Section~\ref{sec:conclusions}), its limitations (Section~\ref{sec:limitations}), directions for future work (Section~\ref{sec:futureWork}), and reflections on the economic, social, environmental and ethical aspects of the work (Section~\ref{sec:reflections}).
 
 \section{Conclusions}
 \label{sec:conclusions}
-\sweExpl{Slutsatser}
-\engExpl{Describe the conclusions (reflect on the whole introduction given in Chapter 1).}
 
+Multidimensional speech quality data is scarce and expensive to collect, while MOS-only data is far more plentiful. This thesis investigated whether combining the two kinds of data gives better speech quality models than multidimensional data alone. To answer this, a two-stage model was designed in which the first stage predicts the four P.804 quality dimensions and the second stage predicts MOS from them, so that MOS-only clips can train the whole model. It was compared with MultiGauss, trained on multidimensional data only, and with MultiGauss trained on the same combined data with a masked loss.
 
-  
-\engExpl{Discuss the positive effects and the drawbacks.\\
-Describe the evaluation of the results of the degree project.\\
-Did you meet your goals?\\
-What insights have you gained?\\
-What suggestions can you give to others working in this area?\\
-If you had it to do again, what would you have done differently?}
+The main conclusions are:
+\begin{enumerate}
+\item \textbf{MOS-only data improves MOS prediction in its own domain.} Adding PSTN clips raised the MOS PCC on PSTN from 0.801 to 0.818, and adding live NISQA calls raised the MOS PCC on live calls from 0.794 to 0.868. The model also placed clips from different training corpora on a more consistent scale. It did not, however, generalise better to corpora that were not used in training.
+\item \textbf{MOS-only data does not improve the quality dimensions.} The hypothesis that better MOS prediction would also lift the four dimensions was not supported. The dimensions were unchanged or slightly worse in every experiment, with the single exception of loudness on live calls.
+\item \textbf{The benefit comes from the data, not from the architecture.} A standard joint model with a masked loss obtained almost the same MOS gain as the two-stage model, without losing accuracy in the dimensions.
+\end{enumerate}
 
-\sweExpl{Uppfyllde du dina mål?\\
-Vilka insikter har du fått?\\
-Vilka förslag kan du ge till andra som arbetar inom detta område?
-Om du skulle göra detta igen, vad skulle du ha gjort annorlunda?}
+For the practical question behind the thesis, this means that MOS-only data is worth adding when MOS prediction on a particular kind of speech matters, and that a masked loss is a simple way to add it. It cannot, however, reduce the amount of multidimensional data needed to predict the dimensions.
+
+All four sub-goals of Section~\ref{sec:goals} were met. The MultiGauss baseline was reproduced, the two-stage model and its mixed-batch training were implemented, the main design choices were studied, and the model was compared with both baselines with significance tests. If the work were to be done again, the masked-loss baseline would be included from the start, since it turned out to be the most informative comparison, and the evaluation protocol, with separate validation and test sets and three runs per setting, would be fixed before the first design studies.
 
 \section{Limitations}
 \label{sec:limitations}
-\sweExpl{Begränsande faktorer\\Vad gjorde du som begränsade dina ansträngningar? Vilka är begränsningarna i dina resultat?}
-\engExpl{What did you find that limited your efforts? What are the limitations of your results?}
 
+The conclusions are limited in the following ways:
+\begin{itemize}
+\item \textbf{One source of dimension labels.} NISQA is the only corpus with P.804 dimension labels used in this thesis, and its speech is English. The results may differ for other languages, other kinds of degradation, or dimension labels collected in other tests.
+\item \textbf{Few MOS-only training corpora.} The MOS-only data came from one separate corpus (PSTN) and from the live part of NISQA. Corpora with other content, such as synthetic or enhanced speech, were used only for evaluation.
+\item \textbf{Three training runs.} Each main setting was trained three times. This is enough to detect differences of about 0.01 with the bootstrap tests, but smaller effects may have been missed, and some design studies were run only once.
+\item \textbf{Design studies on test data.} The early design studies were scored on the test sets. No default setting was changed as a result, but these studies are less clean than the main comparisons.
+\item \textbf{Published baseline in Experiment~A.} In Experiment~A, the baseline is the single published MultiGauss checkpoint, trained with an 8-second crop instead of 10 seconds.
+\item \textbf{Frozen features.} All models use fixed features from one layer of XLS-R. Fine-tuning the feature extractor could change the balance between MOS and the dimensions.
+\item \textbf{Calibration not addressed.} The MOS predictions of the two-stage model have a systematic offset. The research questions were answered with PCC, which is not affected by it, but the absolute values would need calibration before use.
+\end{itemize}
 
 \section{Future work}
 \label{sec:futureWork}
-\sweExpl{Vad du har kvar ogjort?\\Vad är nästa självklara saker som ska göras?\\Vad tips kan du ge till nästa person som kommer att följa upp på ditt arbete?}
-\engExpl{Describe valid future work that you or someone else could or should do.\\
-Consider: What you have left undone? What are the next obvious things to be done? What hints can you give to the next person who is going to follow up on your work?}
 
+\subsection{What has been left undone}
 
-
-Due to the breadth of the problem, only some of the initial goals have been
-met. In these section we will focus on some of the remaining issues that
-should be addressed in future work. ...
-
-\subsection{What has been left undone?}
-\label{what-has-been-left-undone}
-
-The prototype does not address the third requirment, \ie a yearly unavailability of less than 3 minutes; this remains an open problem. ...
-
-\subsubsection{Cost analysis}
-\generalExpl{Example of a missing component}
-The current prototype works, but the performance from a cost perspective makes this an impractical solution. Future work must reduce the cost of this solution; to do so, a cost analysis needs to first be done. ...
-
-\subsubsection{Security}
-\generalExpl{Example of a missing component}
-A future research effort is needed to address the security holes that results from using a self-signed certificate. Page filling text mass. Page filling text mass. ...
-
+The offset in the MOS predictions was identified but not corrected. The next step is to add a correction for the different MOS scales of the training corpora, for example a bias-aware loss~\cite{mittag_biasaware_2021} or a per-corpus mapping, and to test whether this also improves the results on unseen corpora. A simple linear calibration on a validation set would at least show how much of the RMSE gap it removes.
 
 \subsection{Next obvious things to be done}
 
-In particular, the author of this thesis wishes to point out xxxxxx remains as a problem to be solved. Solving this problem is the next thing that should be done. ...
+\begin{itemize}
+\item \textbf{Stronger use of MOS for the dimensions.} The MOS label constrains the dimensions only weakly. Ways to make it more informative include forcing Stage~2 to predict MOS from the dimensions alone, so that the MOS error cannot bypass them, or using the known relation between MOS and the dimensions as an explicit constraint on Stage~1.
+\item \textbf{Combining the masked loss with the cascade.} The masked-loss model was the strongest overall. A model that keeps the joint distribution of MultiGauss and adds a MOS stage on top of it could test whether the cascade adds anything once the masked loss is in place.
+\item \textbf{More data.} Repeating the experiments with other MOS-only corpora, including other languages and synthetic speech, and with any new multidimensional corpus, would show how general the conclusions are.
+\item \textbf{Fine-tuning the features.} Fine-tuning XLS-R, or combining several of its layers, may give the dimensions more information than one fixed layer.
+\item \textbf{Using the uncertainty.} All models in this thesis predict a distribution, but only the means were evaluated. Testing whether the predicted variances are calibrated, and whether MOS-only data affects them, is a natural extension.
+\end{itemize}
 
 \section{Reflections}
 \label{sec:reflections}
-\sweExpl{Reflektioner}
-\sweExpl{Vilka är de relevanta ekonomiska, sociala, miljömässiga och etiska aspekter av ditt arbete?}
-\engExpl{What are the relevant economic, social,
-  environmental, and ethical aspects of your work?
-}
 
+\paragraph{Economic aspects.} Listening tests are expensive, and tests with dimension ratings are more expensive still. The results show where existing MOS-only data can and cannot replace new listening tests: it can improve MOS prediction for a particular kind of speech without new tests, but it cannot save the cost of dimension labels. This helps to decide where money for new listening tests is best spent.
 
+\paragraph{Environmental aspects.} The models are small, with about 0.43 million trainable parameters, and they are trained on features that were computed once and stored. Each training run therefore needs far less computation than fine-tuning a large speech model, and the features are reused across all experiments. Repeating every main setting three times increased the total computation, but was necessary for reliable conclusions. Non-intrusive quality models can also reduce the need for listening tests in which many people take part, each with their own equipment and energy use.
 
-One of the most important results is the reduction in the amount of
-energy required to process each packet while at the same time reducing the
-time required to process each packet.
+\paragraph{Social and ethical aspects.} Speech quality models influence how communication systems are designed and monitored, so their biases matter. The models in this thesis are trained mainly on English speech rated by crowdsourced listeners, and they may not reflect how speakers of other languages, or listeners with hearing impairments, perceive quality. Any deployment should be validated on the population it serves. All corpora used are publicly released research corpora, and no new personal data was collected. The models predict quality and do not identify speakers or interpret content.
 
-The thesis contributes to the UN Sustainable Development Goals numbers 1 and 9 by
-xxxx. 
+\paragraph{Sustainable development.} The thesis contributes to UN Sustainable Development Goal~9 (industry, innovation and infrastructure) by supporting the monitoring and development of reliable communication infrastructure, and by making better use of data that has already been collected.
 
-
-
-
-\noindent\rule{\textwidth}{0.4mm}
-\engExpl{In the references, let Zotero or other tool fill this in for you. I suggest an extended version of the IEEE style, to include URLs, DOIs, ISBNs, etc., to make it easier for your reader to find them. This will make life easier for your opponents and examiner. \\IEEE Editorial Style Manual: \url{https://www.ieee.org/content/dam/ieee-org/ieee/web/org/conferences/style_references_manual.pdf}}
-\sweExpl{Låt Zotero eller annat verktyg fylla i det här för dig. Jag föreslår en utökad version av IEEE stil - att inkludera webbadresser, DOI, ISBN osv. - för att göra det lättare för läsaren att hitta dem. Detta kommer att göra livet lättare för dina opponenter och examinator.}
+\paragraph{Use of generative AI.} The use of generative AI in this work is described in the Acknowledgments.
 
 \cleardoublepage
 % Print the bibliography (and make it appear in the table of contents)
