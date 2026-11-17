@@ -1216,6 +1216,15 @@ The two resulting vectors are concatenated and passed through fully connected la
 
 The dimension values $\vect{q}$ are the main input, in line with the assumption that MOS depends on the dimensions. The encoded features are added because the four dimensions do not explain all of MOS: about 13\,\% of the MOS variance in the simulated training data, and 24\,\% in the live data, is not explained by a linear combination of them (Table~\ref{tab:mosDimCorrelation}). The features give Stage~2 access to the rest of the information in the signal. Section~\ref{sec:designStudyResults} compares this design with a MOS stage that receives only the four dimension values.
 
+Figure~\ref{fig:architecture} shows the complete architecture layer by layer, with the size of each intermediate representation for a 10-second clip. The XLS-R features of a clip form a sequence of 500 vectors of 1\,920 values. Each convolutional layer without padding shortens the sequence by four frames and the pooling divides its length by five, so the encoder output has 32 channels and 19 time steps, which gives a flattened vector $\vect{h}$ of 608 values. In total, the model has about 0.43 million trainable parameters, most of them in the first convolutional layer.
+
+\begin{figure}[!ht]
+  \centering
+  \includegraphics[width=\textwidth]{figures/thesis/architecture.pdf}
+  \caption{Architecture of the two-stage model, layer by layer, with the size of each intermediate representation for a 10-second clip. All dense layers except the last one of each stage are followed by a ReLU activation. The input $\vect{q}$ of Stage~2 is the true dimension values for fully labelled clips during training and Stage~1's predicted means $\vect{\mu}_d$ otherwise. The dashed arrow shows the path along which the MOS error of MOS-only clips trains Stage~1.}
+  \label{fig:architecture}
+\end{figure}
+
 \section{Training}
 \label{sec:training}
 
