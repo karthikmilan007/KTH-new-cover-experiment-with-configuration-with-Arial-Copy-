@@ -723,32 +723,28 @@ We would like to thank xxxx for having yyyy.
 \chapter{Introduction}
 \label{ch:introduction}
 
-Speech is still the main way people communicate over telephone networks, voice-over-IP services and video conferencing. Each of these systems can degrade the speech signal through background noise, lossy coding, packet loss, bandwidth limitation or a badly set level. Service providers and equipment designers therefore need to know how good the speech sounds to the people who hear it. This chapter introduces the problem of predicting perceived speech quality automatically, explains why the lack of labelled data limits current models, and states the purpose, goals, method and delimitations of this thesis.
+Speech is still the main way people communicate over telephone networks, \gls{VoIP} services and video conferencing. Each of these systems can degrade the speech signal through background noise, lossy coding, packet loss, bandwidth limitation or a badly set level. Service providers and equipment designers therefore need to know how good the speech sounds to the people who hear it. This chapter introduces the problem of predicting perceived speech quality automatically, explains why the lack of labelled data limits current models, and states the purpose, goals, method and delimitations of this thesis.
 
 \section{Background}
 \label{sec:background}
 
-The reference measure of speech quality is the \emph{mean opinion score} (MOS). A group of listeners rates each speech clip on a five-point absolute category rating scale, from 1 (bad) to 5 (excellent), and the MOS is the average of their ratings~\cite{itu_p800}. Listening tests give reliable results, but they are slow and expensive, and they cannot be run continuously on a live network. This has motivated \emph{objective} speech quality models that predict MOS directly from the signal. \emph{Non-intrusive} models are particularly useful because they need only the degraded signal, not a clean reference~\cite{mittag_nisqa_2021}.
+The reference measure of speech quality is the \gls{MOS}. A group of listeners rates each speech clip on a five-point \gls{ACR} scale, from 1 (bad) to 5 (excellent), and the MOS is the average of their ratings~\cite{itu_p800}. Listening tests give reliable results, but they are slow and expensive, and they cannot be run continuously on a live network. This has motivated \emph{objective} speech quality models that predict MOS directly from the signal. \emph{Non-intrusive} models are particularly useful because they need only the degraded signal, not a clean reference~\cite{mittag_nisqa_2021}.
 
-A single MOS says how good a clip sounds overall, but not \emph{why} it sounds that way. ITU-T Recommendation P.804~\cite{itu_p804} therefore defines four perceptual quality dimensions in addition to the overall quality: \emph{noisiness} (NOI), \emph{coloration} (COL), \emph{discontinuity} (DIS) and \emph{loudness} (LOUD). Predicting these dimensions makes a model diagnostic. A low MOS caused by background noise needs a different fix from a low MOS caused by packet loss. The NISQA corpus~\cite{mittag_nisqa_2021} made multidimensional prediction practical, as it provides crowdsourced ratings of all five quantities for each clip.
+A single MOS says how good a clip sounds overall, but not \emph{why} it sounds that way. \gls{ITU-T} Recommendation P.804~\cite{itu_p804} therefore defines four perceptual quality dimensions in addition to the overall quality: \emph{noisiness} (NOI), \emph{coloration} (COL), \emph{discontinuity} (DIS) and \emph{loudness} (LOUD). Predicting these dimensions makes a model diagnostic. A low MOS caused by background noise needs a different fix from a low MOS caused by packet loss. The NISQA corpus~\cite{mittag_nisqa_2021} made multidimensional prediction practical, as it provides crowdsourced ratings of all five quantities for each clip.
 
-Recent models build on large self-supervised speech representations, such as wav2vec~2.0 XLS-R~\cite{babu_xlsr_2022}, which are pre-trained on many hours of unlabelled speech and then used as fixed feature extractors. One such model is MultiGauss~\cite{cumlin_multigauss_2025}. It predicts a joint multivariate Gaussian distribution over all five quality scores from XLS-R features. Because the output is a distribution, the model gives an uncertainty estimate as well as a score, and it captures how the dimensions correlate with each other. MultiGauss is the reference model in this thesis.
+Recent models build on speech representations learnt with \gls{SSL} from large amounts of unlabelled speech, such as wav2vec~2.0 XLS-R~\cite{babu_xlsr_2022}, which are pre-trained on many hours of unlabelled speech and then used as fixed feature extractors. One such model is MultiGauss~\cite{cumlin_multigauss_2025}. It predicts a joint multivariate Gaussian distribution over all five quality scores from XLS-R features. Because the output is a distribution, the model gives an uncertainty estimate as well as a score, and it captures how the dimensions correlate with each other. MultiGauss is the reference model in this thesis.
 
 \section{Problem}
 \label{sec:problem}
+\label{sec:researchQuestion}
 
 Training a multidimensional speech quality model requires clips that are labelled with all five scores. Such data is expensive and difficult to collect. Each clip has to be rated on five scales instead of one, so a listening test takes more time and costs more per clip. The listeners also need instructions and training to tell the dimensions apart, which makes it harder to collect the ratings at scale. As a result, little multidimensional data exists. To the author's knowledge, NISQA is the main public corpus with P.804-style dimension ratings. It contains roughly 14\,000 clips across its training, validation and test sets~\cite{mittag_nisqa_2021}, and only 1\,020 of its training clips are real (\emph{live}) calls; the rest have simulated distortions.
 
-Data labelled with MOS alone, by contrast, is available in abundance. MOS has been the standard measure of speech quality for decades, and an overall rating is quick and cheap to collect. One example is the PSTN corpus, which has tens of thousands of real telephone calls rated for MOS only~\cite{mittag_pstn_2020}. Other examples cover different domains, such as synthetic speech~\cite{cooper_bvcc_2022}.
+Data labelled with MOS alone, by contrast, is available in abundance. MOS has been the standard measure of speech quality for decades, and an overall rating is quick and cheap to collect. One example is the PSTN corpus, which has tens of thousands of real telephone calls rated for MOS only~\cite{mittag_pstn_2020}. Other examples cover different domains, such as synthetic speech~\cite{cooper_ssw_2021}.
 
 This raises a practical question. Instead of collecting more expensive multidimensional data, can the scarce multidimensional data be combined with the abundant MOS-only data, so that a model trained on both performs better than a model trained on the multidimensional data alone? If it can, good multidimensional models could be built from less multidimensional data.
 
-\subsection{Original problem and definition}
-\label{sec:researchQuestion}
-
 The problem addressed in this thesis is whether training a multidimensional, probabilistic speech quality model on two kinds of data combined, a small corpus labelled with all five quality scores and a larger corpus labelled with MOS only, improves performance compared with training on the multidimensional corpus alone. Combining the two is not straightforward, because a model that predicts all five scores jointly expects all five labels for every clip. The approach studied is to split the prediction into two stages, based on the assumption that MOS depends on the four quality dimensions. The P.804 dimensions describe the different ways in which a speech signal can be degraded, and the overall quality reflects their combined effect: if one of the dimensions gets better or worse, the MOS can be expected to change with it. The first stage therefore predicts the four quality dimensions from the speech features. The second stage predicts MOS from those four dimensions, together with the speech features themselves, which carry information the four scores may not capture. Because the MOS stage can be trained on its own, clips that carry only a MOS label can still contribute to training. The same assumption also suggests a second, more ambitious hypothesis: if MOS depends on the four dimensions, then learning to predict MOS better should also help the model predict the dimensions better. In the two-stage model, the error on a MOS-only clip is propagated back through the predicted dimensions and the shared feature encoder into the first stage, so the MOS-only data can in principle shape the dimension predictions as well, even though it carries no dimension labels. This thesis refers to the resulting model as the \emph{two-stage model} (Chapter~\ref{ch:whatYouDid}).
-
-\subsection{Scientific and engineering issues}
 
 Combining the two kinds of data raises several questions. First, it is not obvious that extra MOS-only data improves MOS prediction, because different corpora are collected with different listeners, rating procedures and distortions, and their MOS scales do not necessarily agree. Second, even if MOS improves, it is unclear whether the four dimensions also benefit. The hypothesis above says that they should, but the dimensions receive no labels from the extra data, so any gain can only come indirectly through the MOS stage. Third, the two-stage design must be compared with simpler options. These are the joint model trained on fully labelled data only, and a joint model that simply masks out the missing labels in its loss. This leads to the following research questions:
 
@@ -776,7 +772,7 @@ The deliverables are the trained models, the source code and configuration for e
 
 \section{Research Methodology}
 
-This thesis takes a quantitative, experimental approach. Each research question is answered by training models under controlled conditions, changing one factor at a time, and measuring the effect on held-out data. All models share the same frozen self-supervised features, the same convolutional encoder and the same training schedule, so that differences in the results can be attributed to the factor under study. Performance is measured with the Pearson correlation coefficient (PCC) and the root-mean-square error (RMSE) between predicted and subjective scores, for each quality dimension separately.
+This thesis takes a quantitative, experimental approach. Each research question is answered by training models under controlled conditions, changing one factor at a time, and measuring the effect on held-out data. All models share the same frozen self-supervised features, the same convolutional encoder and the same training schedule, so that differences in the results can be attributed to the factor under study. Performance is measured with the \gls{PCC} and the \gls{RMSE} between predicted and subjective scores, for each quality dimension separately.
 
 Training a neural network involves randomness, and small differences in correlation can come from that alone. Every configuration is therefore trained three times with different random initialisations. Differences between models are tested with a hierarchical bootstrap over both training runs and test clips, with a correction for multiple comparisons. A qualitative or user-study method was not chosen, because the subjective ratings that define the ground truth already exist in the corpora used. Chapter~\ref{ch:methods} describes the method in detail.
 
@@ -808,7 +804,7 @@ This chapter gives the background needed to follow the rest of the thesis. Secti
 
 \subsection{Mean opinion score}
 
-Speech quality is a perceptual property: it is defined by how listeners experience a speech signal, not by a physical measurement. The reference method for measuring it is a listening test. ITU-T Recommendation P.800~\cite{itu_p800} describes the most common procedure, the \emph{absolute category rating} (ACR) test. Listeners hear one speech clip at a time and rate its quality on a five-point scale: 5 (excellent), 4 (good), 3 (fair), 2 (poor) and 1 (bad). The \emph{mean opinion score} (MOS) of a clip is the average of the ratings it receives. 
+Speech quality is a perceptual property: it is defined by how listeners experience a speech signal, not by a physical measurement. The reference method for measuring it is a listening test. ITU-T Recommendation P.800~\cite{itu_p800} describes the most common procedure, the \gls{ACR} test. Listeners hear one speech clip at a time and rate its quality on a five-point scale: 5 (excellent), 4 (good), 3 (fair), 2 (poor) and 1 (bad). The \gls{MOS} of a clip is the average of the ratings it receives. 
 
 Laboratory listening tests are slow and expensive, because they require a controlled environment and a panel of listeners. ITU-T P.808~\cite{itu_p808} therefore specifies how to run ACR tests through crowdsourcing, where many listeners rate clips over the internet with their own equipment. Crowdsourcing makes large rated corpora possible, and the corpora used in this thesis were rated in this way~\cite{mittag_nisqa_2021,mittag_pstn_2020}.
 
@@ -821,12 +817,12 @@ MOS states how good a clip sounds, but not why. ITU-T P.804~\cite{itu_p804} defi
 \item[Discontinuity (DIS)] how much the speech is interrupted or distorted in time, for example by packet loss or clipping.
 \item[Loudness (LOUD)] how far the level of the speech is from a comfortable listening level, whether too quiet or too loud.
 \end{description}
-These dimensions follow earlier research on the perceptual space of transmitted speech, which found that most of the perceived differences between degraded speech signals can be described by a small number of underlying dimensions~\cite{mittag_nisqa_2021}. Rating all four dimensions in addition to the overall quality makes each rating task longer and requires listeners to understand the difference between the dimensions. This is one reason why multidimensional data is much scarcer than MOS-only data.
+These dimensions follow earlier research on the perceptual space of transmitted speech, which found that its quality can be described largely by a small number of underlying dimensions~\cite{waltermann_2010}. Rating all four dimensions in addition to the overall quality makes each rating task longer and requires listeners to understand the difference between the dimensions. This is one reason why multidimensional data is much scarcer than MOS-only data.
 
 \subsection{Differences between corpora}
 \label{sec:corpusEffects}
 
-A MOS value is not an absolute quantity. The same clip can receive a different score in two tests, because listeners judge each clip partly in relation to the other clips they hear in the same test. If a test contains mostly poor-quality clips, a medium-quality clip tends to be rated higher than it would be in a test with mostly good clips. The listener panel, the instructions, the listening equipment and the language also influence the ratings~\cite{mittag_biasaware_2021}. As a result, two corpora rated in different tests may use the MOS scale differently, even if both follow the ACR procedure. A model trained on several corpora must therefore learn from labels whose scales do not fully agree. This matters for the two-stage model, which is trained on NISQA and PSTN, two corpora rated in separate tests with different sets of conditions.
+A MOS value is not an absolute quantity. The same clip can receive a different score in two tests, because listeners judge each clip partly in relation to the other clips they hear in the same test. If a test contains mostly poor-quality clips, a medium-quality clip tends to be rated higher than it would be in a test with mostly good clips. The listener panel, the instructions, the listening equipment and the language also influence the ratings, so a MOS holds only for the listeners and the test design with which it was obtained~\cite{itu_p1401,mittag_biasaware_2021}. As a result, two corpora rated in different tests may use the MOS scale differently, even if both follow the ACR procedure. A model trained on several corpora must therefore learn from labels whose scales do not fully agree. This matters for the two-stage model, which is trained on NISQA and PSTN, two corpora rated in separate tests with different sets of conditions.
 
 \section{The relation between MOS and the quality dimensions}
 \label{sec:mosAndDimensions}
@@ -866,7 +862,7 @@ Objective speech quality models predict the result of a listening test from the 
 
 \subsection{Intrusive models}
 
-Intrusive models compare the degraded signal with the clean reference signal it was derived from. The best known are PESQ, ITU-T P.862~\cite{itu_p862}, and its successor POLQA, ITU-T P.863~\cite{itu_p863}. Both align the two signals in time, transform them into a perceptual representation, and map the difference between them to a MOS estimate. Intrusive models are accurate when a reference is available, but in a live call or a recording made in the field, the clean reference does not exist.
+Intrusive models compare the degraded signal with the clean reference signal it was derived from. The best known are \gls{PESQ}, ITU-T P.862~\cite{itu_p862}, and its successor \gls{POLQA}, ITU-T P.863~\cite{itu_p863}. Both align the two signals in time, transform them into a perceptual representation, and map the difference between them to a MOS estimate. Intrusive models are accurate when a reference is available, but in a live call or a recording made in the field, the clean reference does not exist.
 
 \subsection{Non-intrusive models}
 
@@ -888,7 +884,7 @@ A standard regression model predicts a single value for each input and is traine
 
 \subsection{Gaussian negative log-likelihood}
 
-The simplest choice is a Gaussian distribution. For an input $\vect{x}$, the model predicts a mean $\mu(\vect{x})$ and a variance $\sigma^2(\vect{x})$, and is trained to minimise the Gaussian negative log-likelihood (GNLL) of the target $y$~\cite{nix_weigend_1994}:
+The simplest choice is a Gaussian distribution. For an input $\vect{x}$, the model predicts a mean $\mu(\vect{x})$ and a variance $\sigma^2(\vect{x})$, and is trained to minimise the \gls{GNLL} of the target $y$~\cite{nix_weigend_1994}:
 \begin{equation}
   \mathcal{L}_{\text{GNLL}} = \frac{1}{2}\log \sigma^2(\vect{x}) + \frac{\big(y - \mu(\vect{x})\big)^2}{2\,\sigma^2(\vect{x})} + \text{const.}
   \label{eq:gnll}
@@ -916,7 +912,7 @@ When some training examples lack some labels, there are two common ways to still
 
 \subsection{Masking missing labels}
 
-The simplest way is to keep a single model that predicts all outputs and to leave the missing labels out of the loss. Each missing label is marked, for example as \emph{not a number} (NaN), and a mask removes the corresponding terms from the loss, so only the available labels produce gradients. Wang et~al.~\cite{wang_urgentmos_2026} use such a masked loss to train a speech quality model on corpora with different sets of labels, normalising each metric's loss by the number of valid labels. For a Gaussian model, the equivalent is to evaluate the likelihood of the \emph{marginal} distribution of the observed labels, which for a multivariate Gaussian is obtained by keeping only the corresponding entries of $\vect{\mu}$ and $\vect{\Sigma}$. This approach is the baseline for RQ3.
+The simplest way is to keep a single model that predicts all outputs and to leave the missing labels out of the loss. Each missing label is marked, for example as \gls{NaN}, and a mask removes the corresponding terms from the loss, so only the available labels produce gradients. Wang et~al.~\cite{wang_urgentmos_2026} use such a masked loss to train a speech quality model on corpora with different sets of labels, normalising each metric's loss by the number of valid labels. For a Gaussian model, the equivalent is to evaluate the likelihood of the \emph{marginal} distribution of the observed labels, which for a multivariate Gaussian is obtained by keeping only the corresponding entries of $\vect{\mu}$ and $\vect{\Sigma}$. This approach is the baseline for RQ3.
 
 \subsection{Multi-task and cascaded models}
 
@@ -1017,7 +1013,7 @@ The SIM and LIVE parts have quite different label distributions, which is import
 
 \subsection{PSTN corpus}
 
-The PSTN corpus~\cite{mittag_pstn_2020} contains real telephone calls made over the public switched telephone network and VoIP, rated with crowdsourced ACR tests. It has MOS labels only, so it serves as the MOS-only corpus in Experiment~A. Because of storage limits, two subsets were drawn from it, each stratified by MOS so that the score distribution of the full set is preserved:
+The PSTN corpus~\cite{mittag_pstn_2020} contains real telephone calls made over the \gls{PSTN} and \gls{VoIP}, rated with crowdsourced ACR tests. It has MOS labels only, so it serves as the MOS-only corpus in Experiment~A. Because of storage limits, two subsets were drawn from it, each stratified by MOS so that the score distribution of the full set is preserved:
 \begin{itemize}
 \item \textbf{PSTN\_TRAIN12K}: 12\,000 clips from the PSTN training set, used for training (mean MOS 3.12, standard deviation 0.87).
 \item \textbf{PSTN\_VAL2K}: 2\,000 clips from the PSTN validation set, used only for evaluation.
@@ -1025,7 +1021,7 @@ The PSTN corpus~\cite{mittag_pstn_2020} contains real telephone calls made over 
 
 \subsection{BVCC}
 
-BVCC~\cite{cooper_bvcc_2022} contains synthetic speech from text-to-speech and voice conversion systems, rated for naturalness on a MOS scale. Its validation set of 387 clips is used only to evaluate how well the models generalise to a domain none of them was trained on.
+BVCC~\cite{cooper_ssw_2021} contains synthetic speech from \gls{TTS} and voice conversion systems, rated for naturalness on a MOS scale. Its validation set of 387 clips is used only to evaluate how well the models generalise to a domain none of them was trained on.
 
 \subsection{Overlap check}
 
@@ -1047,7 +1043,7 @@ The choice of layer was examined in an early design study (Section~\ref{sec:desi
 
 MultiGauss~\cite{cumlin_multigauss_2025} is the main baseline (Section~\ref{sec:multigaussBackground}). Its architecture is:
 \begin{itemize}
-\item two one-dimensional convolutional layers with 32 channels and kernel size 5, each followed by layer normalisation, a ReLU activation, dropout of 0.3 and max pooling by a factor of 5;
+\item two one-dimensional convolutional layers with 32 channels and kernel size 5, each followed by layer normalisation, a \gls{ReLU} activation, dropout of 0.3 and max pooling by a factor of 5;
 \item three fully connected layers with 64, 32 and 20 outputs;
 \item the 20 outputs give 5 means and the 15 elements of a lower-triangular Cholesky factor, which form a five-dimensional Gaussian over MOS, NOI, COL, DIS and LOUD.
 \end{itemize}
@@ -1129,7 +1125,17 @@ The XLS-R layer study and the first batch ratio study were single training runs,
 
 \subsection{Metrics}
 
-Each model is evaluated separately for MOS and each of the four dimensions, using the per-clip predicted means. The main metric is the \emph{Pearson correlation coefficient} (PCC) between predicted and true scores, which measures how well the model ranks the clips, independently of any constant offset or scaling. The \emph{root-mean-square error} (RMSE) is also reported, as it measures how close the predicted values are to the true ones on the absolute scale. As a single summary of the multidimensional performance, the average of the five PCCs is used, as in the MultiGauss paper~\cite{cumlin_multigauss_2025}.
+Each model is evaluated separately for MOS and each of the four dimensions, using the per-clip predicted means. Let $y_n$ and $\hat{y}_n$ denote the true and the predicted score of clip $n$ in a set of $N$ clips, with means $\bar{y}$ and $\bar{\hat{y}}$. The main metric is the \gls{PCC},
+\begin{equation}
+  \rho = \frac{\sum_{n}\big(y_n - \bar{y}\big)\big(\hat{y}_n - \bar{\hat{y}}\big)}{\sqrt{\sum_{n}\big(y_n - \bar{y}\big)^2 \, \sum_{n}\big(\hat{y}_n - \bar{\hat{y}}\big)^2}},
+  \label{eq:pcc}
+\end{equation}
+which measures how well the predictions follow the true scores. It does not change when the predictions are shifted or scaled by a positive factor, so it shows whether the model ranks the clips correctly, but not whether its values are correct. The \gls{RMSE},
+\begin{equation}
+  \mathrm{RMSE} = \sqrt{\frac{1}{N}\sum_{n}\big(\hat{y}_n - y_n\big)^2},
+  \label{eq:rmse}
+\end{equation}
+is also reported, as it measures the error on the original rating scale and therefore captures the offsets and scaling that the \gls{PCC} ignores. As a single summary of the multidimensional performance, the average of the five PCCs is used, as in the MultiGauss paper~\cite{cumlin_multigauss_2025}.
 
 \subsection{Evaluation sets}
 
@@ -1303,7 +1309,7 @@ The XLS-R features were computed once and stored, and the training data is held 
 
 This chapter presents the results. Section~\ref{sec:designStudyResults} reports the design studies that led to the final configuration of the two-stage model. Sections~\ref{sec:resultsExpA} and~\ref{sec:resultsExpB} report the two main experiments, and Section~\ref{sec:resultsMasked} compares the two-stage model with the masked-loss baseline. Section~\ref{sec:resultsTuning} reports the hyperparameter tuning, and Section~\ref{sec:resultsCalibration} looks at the absolute accuracy of the predictions. Sections~\ref{sec:reliabilityAnalysis} and~\ref{sec:validityAnalysis} discuss how reliable and valid the results are.
 
-Unless stated otherwise, all numbers are Pearson correlation coefficients (PCC) between predicted and true scores, averaged over three training runs. Differences marked with an asterisk ($^{*}$) are statistically significant (hierarchical bootstrap, Holm-corrected $p < 0.05$, Section~\ref{sec:evaluation}). \emph{Avg.} is the average PCC over the five quantities.
+Unless stated otherwise, all numbers are \glspl{PCC} between predicted and true scores, averaged over three training runs. Differences marked with an asterisk ($^{*}$) are statistically significant (hierarchical bootstrap, Holm-corrected $p < 0.05$, Section~\ref{sec:evaluation}). \emph{Avg.} is the average PCC over the five quantities.
 
 \section{Design studies}
 \label{sec:designStudyResults}
@@ -1434,7 +1440,7 @@ Table~\ref{tab:expANisqaVal} shows all five quantities on the NISQA validation s
   \end{tabular}
 \end{table}
 
-\paragraph{Corpora not seen in training.} The models were also evaluated on two MOS-only corpora that neither of them was trained on: BVCC, with synthetic speech, and TCD-VoIP, with VoIP degradations. On a combined set of 383 clips each from NISQA, PSTN, BVCC and TCD-VoIP, the two-stage model reached a MOS PCC of 0.856 against 0.813 for MultiGauss, a significant improvement. On each unseen corpus on its own, however, it did not do better: on BVCC its PCC was 0.835 against 0.843 (not significant), and on TCD-VoIP 0.871 against 0.887 (significant). The gain on the combined set therefore again comes mainly from a more consistent scale across corpora, not from ranking the clips within a new corpus better.
+\paragraph{Corpora not seen in training.} The models were also evaluated on two MOS-only corpora that neither of them was trained on: BVCC~\cite{cooper_ssw_2021}, with synthetic speech, and TCD-VoIP~\cite{harte_tcdvoip_2015}, with \gls{VoIP} degradations. On a combined set of 383 clips each from NISQA, PSTN, BVCC and TCD-VoIP, the two-stage model reached a MOS PCC of 0.856 against 0.813 for MultiGauss, a significant improvement. On each unseen corpus on its own, however, it did not do better: on BVCC its PCC was 0.835 against 0.843 (not significant), and on TCD-VoIP 0.871 against 0.887 (significant). The gain on the combined set therefore again comes mainly from a more consistent scale across corpora, not from ranking the clips within a new corpus better.
 
 \section{Experiment B: a MOS-only subset of the same corpus}
 \label{sec:resultsExpB}
